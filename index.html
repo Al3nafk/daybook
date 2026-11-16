@@ -363,6 +363,10 @@ const VIEWS = [["today", "Today"], ["calendar", "Calendar"], ["tasks", "Tasks"],
 /* ---------- state ---------- */
 const LS_KEY = "daybook.v1";
 const STANDALONE = !window.claude; // running as the installed app rather than inside claude.ai
+const IS_INSTALLED = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let installEvt = null, showInstallHelp = false;
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; render(); });
+addEventListener("appinstalled", () => { installEvt = null; showInstallHelp = false; toast("Daybook is on your home screen"); render(); });
 const EMPTY = () => ({ v: 1, updated: 0, example: false, notes: {}, noteReminder: { enabled: true, time: "21:30" },
   tasks: [], habits: [], events: [], checkins: {}, chat: [], fired: {} });
 
@@ -563,12 +567,25 @@ function nav() {
 function head(eyebrow, title, sub, right = "") {
   return `<header class="page-head"><div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ""}</div><div class="chips">${right}${syncChip()}</div></header>` + exampleBanner();
 }
+function installBtn(cls) {
+  if (!STANDALONE || IS_INSTALLED) return "";
+  return installEvt ? `<button class="btn ${cls}" data-act="install">Install app</button>` : `<button class="btn ${cls}" data-act="installHelp">How to install</button>`;
+}
+function installSteps() {
+  const ua = navigator.userAgent;
+  if (/Instagram|FBAN|FBAV|MicroMessenger|xhsdiscover|XiaoHongShu|Line\/|TikTok|musical_ly|WhatsApp/i.test(ua))
+    return ["This page is open inside another app, which can't install apps.", "Tap the ⋮ or ⋯ menu and choose Open in Chrome (or Open in browser).", "In Chrome, tap ⋮ and choose Install app or Add to Home screen."];
+  if (/iPhone|iPad|iPod/.test(ua)) return ["Open this page in Safari.", "Tap the Share button (the square with an arrow).", "Choose Add to Home Screen, then tap Add."];
+  if (/SamsungBrowser/.test(ua)) return ["Tap the ≡ menu at the bottom of Samsung Internet.", "Choose Add page to, then Home screen.", "For the full app experience, open this page in Chrome instead."];
+  if (/Android/.test(ua)) return ["Tap the ⋮ menu at the top right of Chrome.", "Choose Install app (or Add to Home screen).", "Tap Install. Daybook appears on your home screen with its own icon."];
+  return ["Open this page on your phone in Chrome (Android) or Safari (iPhone).", "Use the browser menu: Install app or Add to Home Screen."];
+}
 function exampleBanner() {
-  return S.example ? `<div class="banner"><p><strong>These are example entries</strong> so you can see how Daybook works. Nothing is saved until you change something or keep them.</p><button class="btn small primary" data-act="fresh">Start fresh</button><button class="btn small" data-act="keep">Keep examples</button></div>` : "";
+  return (showInstallHelp ? `<div class="banner"><div style="flex:1 1 260px"><strong>Install Daybook</strong><ol style="margin:6px 0 0;padding-left:20px">${installSteps().map(s => `<li>${esc(s)}</li>`).join("")}</ol></div><button class="btn small" data-act="closeInstall">Got it</button></div>` : "") + (S.example ? `<div class="banner"><p><strong>These are example entries</strong> so you can see how Daybook works. Nothing is saved until you change something or keep them.</p><button class="btn small primary" data-act="fresh">Start fresh</button><button class="btn small" data-act="keep">Keep examples</button></div>` : "");
 }
 function hero(eyebrow, title, sub) {
   return `<header class="hero"><div class="hero-text"><p class="eyebrow">${eyebrow}</p><h1>${title}</h1><p class="sub">${sub}</p>
-    <div class="hero-actions"><button class="btn hero-btn" data-act="go" data-view="ask">Ask Daybook</button>${syncChip()}</div></div><div aria-hidden="true">${orb("")}</div></header>` + exampleBanner();
+    <div class="hero-actions">${installBtn("hero-btn")}<button class="btn hero-btn" data-act="go" data-view="ask">Ask Daybook</button>${syncChip()}</div></div><div aria-hidden="true">${orb("")}</div></header>` + exampleBanner();
 }
 let orbDots = "";
 function orb(label) {
@@ -815,6 +832,7 @@ function viewMe() {
     ${STANDALONE ? `<section class="panel span-12">
       <div class="panel-head"><h2>This phone</h2><span class="eyebrow">notes, tasks and check-ins are kept on this device</span></div>
       <div class="form-row">
+        ${installBtn("primary")}
         ${"Notification" in window ? (Notification.permission === "granted" ? `<span class="chip good"><span class="dot"></span>Notifications on</span>` : `<button class="btn primary" data-act="enableNotif">Turn on notifications</button>`) : ""}
         <button class="btn" data-act="exportData">Download backup</button>
         <label class="btn" for="import-file">Restore from backup</label><input type="file" id="import-file" accept="application/json,.json" hidden>
@@ -881,6 +899,14 @@ const ACT = {
   say: b => { handleChat(b.dataset.t); },
   clearChat: () => { S.chat = []; commit(); },
   stopAi: () => { aiBusy?.abort(); },
+  install: async () => {
+    if (!installEvt) { showInstallHelp = true; render(); return; }
+    const evt = installEvt; installEvt = null;
+    try { await evt.prompt(); await evt.userChoice; } catch {}
+    render();
+  },
+  installHelp: () => { showInstallHelp = true; render(); scrollTo(0, 0); },
+  closeInstall: () => { showInstallHelp = false; render(); },
   enableNotif: async () => { try { await Notification.requestPermission(); } catch {} render(); },
   exportData: () => {
     try {
