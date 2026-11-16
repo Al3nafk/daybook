@@ -7,6 +7,10 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head><body>
 <title>Daybook</title>
@@ -112,7 +116,7 @@ main{padding-block:28px 56px;min-width:0;max-width:1080px;width:100%}
 
 .field{display:grid;gap:4px;min-width:0}
 .field label,.label{font-size:.78rem;font-weight:600;color:var(--muted)}
-input[type=text],input[type=date],input[type=time],input[type=number],input[type=search],select,textarea{
+input[type=text],input[type=password],input[type=date],input[type=time],input[type=number],input[type=search],select,textarea{
   width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-width:0}
 textarea{resize:vertical;line-height:1.6}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
@@ -231,7 +235,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .banner{background:var(--glass);border:1px dashed var(--peri);border-radius:18px}
 .btn{border-radius:999px;padding:8px 16px}
 .btn.primary{background:linear-gradient(120deg,var(--hero-a),var(--hero-b));border-color:transparent;color:var(--hero-ink);box-shadow:0 10px 20px -12px var(--hero-a)}
-input[type=text],input[type=date],input[type=time],input[type=number],input[type=search],select{background:var(--surface);border-radius:14px;padding:9px 13px}
+input[type=text],input[type=password],input[type=date],input[type=time],input[type=number],input[type=search],select{background:var(--surface);border-radius:14px;padding:9px 13px}
 textarea{background:var(--surface);border-radius:18px;padding:14px 16px}
 .composer input{border-radius:999px;padding-inline:18px}
 .seg button{border-radius:14px;background:var(--surface);flex:1 1 0;min-width:0;padding:6px 4px}
@@ -243,6 +247,10 @@ textarea{background:var(--surface);border-radius:18px;padding:14px 16px}
 .kind.task,.dots i.t{background:var(--rose)}
 .dots i{background:var(--accent)}
 .chip.rose{background:var(--rose-soft);color:var(--rose)}
+.app.locked{grid-template-columns:minmax(0,1fr)}
+.auth{display:grid;justify-items:center;gap:8px;padding-block:24px;max-width:440px;margin:0 auto}
+.auth-card{width:100%;gap:16px}
+.auth-card h1{font-size:1.7rem}
 .remind-pick{border:0;padding:0;margin:0;display:grid;gap:6px;min-width:0}
 .pills{display:flex;flex-wrap:wrap;gap:6px}
 .pill{position:relative;cursor:pointer}
@@ -375,6 +383,7 @@ const VIEWS = [["today", "Today"], ["calendar", "Calendar"], ["tasks", "Tasks"],
 /* ---------- state ---------- */
 const LS_KEY = "daybook.v1";
 const STANDALONE = !window.claude; // running as the installed app rather than inside claude.ai
+let fbUser = null; // signed-in Firebase user (installed app only)
 const IS_INSTALLED = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 let installEvt = null, showInstallHelp = false;
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; render(); });
@@ -413,8 +422,10 @@ function makeExample() {
   return s;
 }
 function normalize(s) { const e = EMPTY(); const o = Object.assign(e, s || {}); o.noteReminder = Object.assign(EMPTY().noteReminder, o.noteReminder || {}); return o; }
-function loadLocal() { try { const r = localStorage.getItem(LS_KEY); return r ? normalize(JSON.parse(r)) : null; } catch { return null; } }
-function saveLocal() { if (S.example) return; try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} }
+// Each signed-in user gets their own on-device copy; the unsigned key is the pre-accounts copy.
+function lsKey() { return fbUser ? LS_KEY + "." + fbUser.uid : LS_KEY; }
+function loadLocal() { try { const r = localStorage.getItem(lsKey()); return r ? normalize(JSON.parse(r)) : null; } catch { return null; } }
+function saveLocal() { if (S.example) return; try { localStorage.setItem(lsKey(), JSON.stringify(S)); } catch {} }
 function pref(k, v) { try { if (v === undefined) return localStorage.getItem("daybook." + k); localStorage.setItem("daybook." + k, v); } catch { return null; } }
 
 let S = loadLocal() || makeExample();
@@ -456,9 +467,13 @@ async function initStore() {
   const id = await user.id();
   if (!id) return;
   docRef = db.doc("data/users/" + id + "/daybook");
+  watchDoc(docRef);
+}
+// Works for both the claude.ai store and Firestore: their document snapshots share this shape.
+function watchDoc(ref) {
   setSync("connecting");
   const timer = setTimeout(() => { if (sync === "connecting") setSync("device"); }, 10000);
-  docRef.onSnapshot(snap => {
+  return ref.onSnapshot(snap => {
     if (snap.metadata.hasPendingWrites) return;
     if (!snap.metadata.fromCache) { clearTimeout(timer); if (sync === "connecting") setSync("saved"); }
     if (snap.exists) {
@@ -469,6 +484,48 @@ async function initStore() {
     } else if (!snap.metadata.fromCache && !S.example && S.updated) queueRemote();
   }, () => { clearTimeout(timer); setSync("device"); docRef = null; });
 }
+
+/* ---------- accounts (installed app only: Firebase sign-in, one private document per user) ---------- */
+const FB = (() => {
+  if (!STANDALONE || !window.firebase || !window.DAYBOOK_FIREBASE) return null;
+  try {
+    firebase.initializeApp(window.DAYBOOK_FIREBASE);
+    const db = firebase.firestore();
+    db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    return { auth: firebase.auth(), db };
+  } catch { return null; }
+})();
+let fbUnsub = null, authReady = !FB, authMode = "signin", authMsg = "", authEmail = "";
+function firstName() { return ((fbUser && fbUser.displayName) || "").trim().split(/\s+/)[0]; }
+function authError(code) {
+  return ({
+    "auth/invalid-credential": "That email and password don't match. Check them or reset your password.",
+    "auth/wrong-password": "That email and password don't match. Check them or reset your password.",
+    "auth/user-not-found": "No account uses that email yet. Create one instead.",
+    "auth/email-already-in-use": "An account already uses that email. Sign in instead.",
+    "auth/weak-password": "Use a password with at least 6 characters.",
+    "auth/invalid-email": "That email address doesn't look right.",
+    "auth/missing-password": "Enter your password.",
+    "auth/too-many-requests": "Too many tries. Wait a few minutes, then try again.",
+    "auth/network-request-failed": "You're offline. Connect to the internet to sign in the first time.",
+  })[code] || "Something went wrong signing in. Try again.";
+}
+if (FB) FB.auth.onAuthStateChanged(u => {
+  if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+  clearTimeout(saveTimer); dirty = false; docRef = null;
+  fbUser = u; authReady = true;
+  if (!u) { S = EMPTY(); render(); return; }
+  let local = loadLocal();
+  if (!local) {
+    // First sign-in on this device: carry over data saved before accounts existed, once.
+    try { const legacy = localStorage.getItem(LS_KEY); if (legacy) { local = normalize(JSON.parse(legacy)); localStorage.removeItem(LS_KEY); } } catch {}
+  }
+  S = local || Object.assign(EMPTY(), { chat: [{ role: "assistant", content: `Welcome${firstName() ? ", " + firstName() : ""}! Tell me what's coming up and I'll keep track of it. Type "help" to see what I can do.`, source: "offline", ts: Date.now() }] });
+  S.example = false;
+  docRef = FB.db.doc(`users/${u.uid}/data/daybook`);
+  fbUnsub = watchDoc(docRef);
+  render();
+});
 
 /* ---------- derived data ---------- */
 function agenda(date) {
@@ -578,7 +635,7 @@ function nav() {
   const od = overdueCount();
   $("#nav").innerHTML = `<div class="brand"><span class="brand-mark">D</span>Daybook</div>` +
     VIEWS.map(([k, label]) => `<button class="nav-btn" data-act="go" data-view="${k}" ${view === k ? 'aria-current="page"' : ""}>${ICON[k]}<span>${label === "Assistant" && innerWidth < 820 ? "Ask" : label}</span>${k === "tasks" && od ? `<span class="badge">${od}</span>` : ""}</button>`).join("") +
-    `<div class="nav-foot"><span>Reminders ring while Daybook is open.</span><span id="netline">${navigator.onLine ? "Online" : "Offline"} · assistant works either way</span></div>`;
+    `<div class="nav-foot">${fbUser ? `<span><strong>${esc(fbUser.displayName || fbUser.email)}</strong></span><button class="link" style="justify-self:start" data-act="signOut">Sign out</button>` : ""}<span>Reminders ring while Daybook is open.</span><span id="netline">${navigator.onLine ? "Online" : "Offline"} · assistant works either way</span></div>`;
 }
 function head(eyebrow, title, sub, right = "") {
   return `<header class="page-head"><div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ""}</div><div class="chips">${right}${syncChip()}</div></header>` + exampleBanner();
@@ -631,7 +688,7 @@ function agendaItem(a, opts = {}) {
 
 function viewToday() {
   const now = new Date(), h = now.getHours(), td = todayStr();
-  const greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  const greet = (h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening") + (firstName() ? ", " + esc(firstName()) : "");
   const items = agenda(td);
   const overdue = S.tasks.filter(t => !t.done && t.due && t.due < td);
   const ci = S.checkins[td];
@@ -847,7 +904,8 @@ function viewMe() {
       </div>
     </section>
     ${STANDALONE ? `<section class="panel span-12">
-      <div class="panel-head"><h2>This phone</h2><span class="eyebrow">notes, tasks and check-ins are kept on this device</span></div>
+      <div class="panel-head"><h2>${fbUser ? "Account" : "This phone"}</h2><span class="eyebrow">${fbUser ? "synced across your devices" : "notes, tasks and check-ins are kept on this device"}</span></div>
+      ${fbUser ? `<div class="form-row" style="align-items:center"><span>Signed in as <strong>${esc(fbUser.displayName || fbUser.email)}</strong> <span class="muted">${esc(fbUser.displayName ? fbUser.email : "")}</span></span><button class="btn" data-act="signOut">Sign out</button></div>` : ""}
       <div class="form-row">
         ${installBtn("primary")}
         ${"Notification" in window ? (Notification.permission === "granted" ? `<span class="chip good"><span class="dot"></span>Notifications on</span>` : `<button class="btn primary" data-act="enableNotif">Turn on notifications</button>`) : ""}
@@ -879,7 +937,34 @@ function viewAsk() {
   </section>`;
 }
 
+function viewAuth() {
+  const up = authMode === "signup";
+  return `<section class="auth">
+    <div class="orb-wrap" style="--orb:170px">${orb("Daybook")}</div>
+    <div class="panel auth-card">
+      <div><h1>${up ? "Create your account" : "Welcome back"}</h1><p class="muted" style="margin-top:6px">${up ? "Each person gets their own private Daybook, synced across their phone and computer." : "Sign in to see your notes, tasks and reminders on any device."}</p></div>
+      <div class="seg" role="group" aria-label="Account"><button data-act="authMode" data-v="signin" aria-pressed="${!up}">Sign in</button><button data-act="authMode" data-v="signup" aria-pressed="${up}">Create account</button></div>
+      <form data-form="auth" style="display:grid;gap:12px">
+        ${up ? `<div class="field"><label for="au-name">Your name</label><input type="text" id="au-name" autocomplete="name" required></div>` : ""}
+        <div class="field"><label for="au-email">Email</label><input type="text" inputmode="email" id="au-email" autocomplete="email" value="${esc(authEmail)}" required></div>
+        <div class="field"><label for="au-pw">Password</label><input type="password" id="au-pw" autocomplete="${up ? "new-password" : "current-password"}" minlength="6" required></div>
+        ${authMsg ? `<p role="alert" style="color:var(--bad);font-size:.88rem">${esc(authMsg)}</p>` : ""}
+        <button class="btn primary">${up ? "Create account" : "Sign in"}</button>
+        ${up ? "" : `<button type="button" class="link" data-act="resetPw" style="justify-self:center">Forgot password?</button>`}
+      </form>
+    </div>
+  </section>`;
+}
 function render() {
+  const locked = !!FB && !fbUser;
+  $("#nav").hidden = locked;
+  $(".app").classList.toggle("locked", locked);
+  if (locked) {
+    const fid = document.activeElement && document.activeElement.id;
+    $("#main").innerHTML = authReady ? viewAuth() : `<p class="empty" style="text-align:center;padding-top:30vh">Opening Daybook…</p>`;
+    const el = fid && document.getElementById(fid); if (el) el.focus();
+    return;
+  }
   nav();
   const main = $("#main");
   const focusId = document.activeElement && document.activeElement.id;
@@ -928,6 +1013,13 @@ const ACT = {
   },
   installHelp: () => { showInstallHelp = true; render(); scrollTo(0, 0); },
   closeInstall: () => { showInstallHelp = false; render(); },
+  authMode: b => { authEmail = $("#au-email")?.value.trim() || authEmail; authMode = b.dataset.v; authMsg = ""; render(); },
+  resetPw: () => {
+    authEmail = $("#au-email")?.value.trim() || "";
+    if (!authEmail) { authMsg = "Type your email above first, then tap Forgot password."; render(); return; }
+    FB.auth.sendPasswordResetEmail(authEmail).then(() => { authMsg = ""; toast(`Password reset email sent to ${authEmail}`); render(); }).catch(e => { authMsg = authError(e.code); render(); });
+  },
+  signOut: () => { flush(); FB && FB.auth.signOut(); },
   enableNotif: async () => { try { await Notification.requestPermission(); } catch {} render(); },
   exportData: () => {
     try {
@@ -952,6 +1044,16 @@ document.addEventListener("submit", e => {
     case "addHabit": { if (!v("hb-name")) return; S.habits.push({ id: uid(), name: v("hb-name"), log: {} }); commit(); break; }
     case "chat": { const t = v("chat-in"); if (t) handleChat(t); break; }
     case "quickAsk": { const t = v("quick-ask"); if (t) { view = "ask"; handleChat(t); go("ask"); } break; }
+    case "auth": {
+      authEmail = v("au-email"); authMsg = "";
+      const pw = document.getElementById("au-pw").value, name = v("au-name");
+      const btn = f.querySelector(".btn.primary"); btn.disabled = true; btn.textContent = "One moment…";
+      (authMode === "signup"
+        ? FB.auth.createUserWithEmailAndPassword(authEmail, pw).then(c => name && c.user.updateProfile({ displayName: name })).then(() => render())
+        : FB.auth.signInWithEmailAndPassword(authEmail, pw)
+      ).catch(e => { authMsg = authError(e.code); render(); });
+      break;
+    }
   }
 });
 

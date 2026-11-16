@@ -1,6 +1,6 @@
 // Network first so updates arrive whenever the phone is online; the cache keeps Daybook working offline.
 const CACHE = "daybook-shell";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
+const SHELL = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png", "firebase-config.js"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
@@ -14,6 +14,9 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
+  // Only the app itself, its fonts and the Firebase libraries; sign-in and sync traffic goes straight to the network.
+  const host = new URL(req.url).hostname;
+  if (host !== self.location.hostname && !["fonts.googleapis.com", "fonts.gstatic.com", "www.gstatic.com"].includes(host)) return;
   e.respondWith(
     fetch(req)
       .then(res => {
