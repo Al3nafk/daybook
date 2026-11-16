@@ -243,6 +243,14 @@ textarea{background:var(--surface);border-radius:18px;padding:14px 16px}
 .kind.task,.dots i.t{background:var(--rose)}
 .dots i{background:var(--accent)}
 .chip.rose{background:var(--rose-soft);color:var(--rose)}
+.remind-pick{border:0;padding:0;margin:0;display:grid;gap:6px;min-width:0}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{position:relative;cursor:pointer}
+.pill input{position:absolute;opacity:0;pointer-events:none}
+.pill span{display:inline-block;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:.84rem;font-weight:600;color:var(--muted)}
+.pill:hover span{border-color:var(--peri);color:var(--ink)}
+.pill input:checked+span{background:linear-gradient(120deg,var(--hero-a),var(--hero-b));border-color:transparent;color:var(--hero-ink)}
+.pill input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
 .chart .bar.amber{fill:var(--rose)}
 .stat{border-radius:16px}
 .day{border-radius:14px}
@@ -342,6 +350,10 @@ function fmtDay(s, long) {
   return parseYmd(s).toLocaleDateString(undefined, long ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric", month: "short" });
 }
 function fmtRemind(min) { if (min == null) return ""; if (min === 0) return "at start"; if (min >= 1440) return `${min / 1440} day before`; if (min >= 60) return `${min / 60} h before`; return `${min} min before`; }
+// An event's reminders: minutes before the start. Older entries store one number instead of a list.
+function reminds(e) { return Array.isArray(e.remind) ? e.remind : e.remind == null ? [] : [e.remind]; }
+function fmtReminds(e) { return reminds(e).map(fmtRemind).join(", "); }
+const REMIND_OPTS = [[0, "At start"], [5, "5 min"], [15, "15 min"], [30, "30 min"], [60, "1 hour"], [120, "2 hours"], [1440, "1 day"], [10080, "1 week"]];
 const MOOD = ["", "Rough", "Low", "Okay", "Good", "Great"];
 const ENERGY = ["", "Drained", "Tired", "Steady", "Lively", "Charged"];
 
@@ -466,7 +478,7 @@ function agenda(date) {
 }
 function upcomingReminders(limit = 5) {
   const now = Date.now(), horizon = now + 7 * 864e5, out = [];
-  for (const e of S.events) if (e.remind != null && e.time) { const at = dt(e.date, e.time) - e.remind * 6e4; if (at > now - 6e4 && at < horizon) out.push({ at, title: e.title, what: `${fmtTime(e.time)} · ${fmtRemind(e.remind)}`, kind: "event" }); }
+  for (const e of S.events) if (e.time) for (const m of reminds(e)) { const at = dt(e.date, e.time) - m * 6e4; if (at > now - 6e4 && at < horizon) out.push({ at, title: e.title, what: `${fmtTime(e.time)} · ${fmtRemind(m)}`, kind: "event" }); }
   for (const t of S.tasks) if (!t.done && t.remind && t.due && t.time) { const at = dt(t.due, t.time); if (at > now - 6e4 && at < horizon) out.push({ at, title: t.title, what: "Task due", kind: "task" }); }
   const nr = S.noteReminder, td = todayStr();
   if (nr.enabled) { let day = td; if (dt(td, nr.time) < now || (S.notes[td]?.text || "").trim()) day = ymd(addDays(new Date(), 1)); out.push({ at: dt(day, nr.time), title: "Write your daily note", what: "Daily", kind: "note" }); }
@@ -505,9 +517,13 @@ function setFired(key, v) { S.fired[key] = v; if (!S.example) { S.updated = Date
 function dueReminders() {
   const now = Date.now(), out = [];
   for (const e of S.events) {
-    if (e.remind == null || !e.time) continue;
-    const start = dt(e.date, e.time), at = start - e.remind * 6e4, key = `ev:${e.id}:${e.date}T${e.time}`;
-    if (now >= at && now < start + 30 * 6e4 && !isFired(key, now)) out.push({ key, title: e.title, body: `${fmtDay(e.date)} at ${fmtTime(e.time)}${e.remind ? " · " + fmtRemind(e.remind) : ""}`, go: "calendar", date: e.date });
+    if (!e.time) continue;
+    const start = dt(e.date, e.time);
+    // Only the latest reminder that has come due fires; earlier ones it supersedes are skipped.
+    const due = reminds(e).filter(m => now >= start - m * 6e4 && now < start + 30 * 6e4).sort((a, b) => a - b)[0];
+    if (due === undefined) continue;
+    const key = `ev:${e.id}:${e.date}T${e.time}:${due}`;
+    if (!isFired(key, now)) out.push({ key, title: e.title, body: `${fmtDay(e.date)} at ${fmtTime(e.time)}${due ? " · " + fmtRemind(due) : ""}`, go: "calendar", date: e.date });
   }
   for (const t of S.tasks) {
     if (t.done || !t.remind || !t.due || !t.time) continue;
@@ -609,7 +625,7 @@ function agendaItem(a, opts = {}) {
     ${isTask ? `<button class="tick" data-act="toggleTask" data-id="${a.id}" aria-pressed="${!!a.done}" aria-label="Mark ${esc(a.title)} done">${a.done ? ICON.check : ""}</button>` : `<span class="kind"></span>`}
     <span class="time">${a.time ? fmtTime(a.time) : isTask ? "Any time" : "All day"}</span>
     <div class="body"><div class="title">${esc(a.title)}</div><div class="meta">${isTask ? `<span class="pri ${a.priority}">${a.priority === "med" ? "medium" : a.priority}</span>` : "<span>Event</span>"}
-      ${(isTask ? a.remind && a.time : a.remind != null) ? `<span class="bell">${ICON.bell}${isTask ? "at due time" : fmtRemind(a.remind)}</span>` : ""}${opts.day ? `<span>${fmtDay(a.due || a.date)}</span>` : ""}</div></div>
+      ${(isTask ? a.remind && a.time : reminds(a).length) ? `<span class="bell">${ICON.bell}${isTask ? "at due time" : fmtReminds(a)}</span>` : ""}${opts.day ? `<span>${fmtDay(a.due || a.date)}</span>` : ""}</div></div>
     ${opts.del ? `<button class="icon-btn" data-act="${isTask ? "delTask" : "delEvent"}" data-id="${a.id}" aria-label="Delete ${esc(a.title)}">${ICON.trash}</button>` : ""}</li>`;
 }
 
@@ -691,9 +707,10 @@ function viewCalendar() {
         <div class="form-row">
           <div class="field"><label for="ev-date">Date</label><input type="date" id="ev-date" value="${calSel}" required></div>
           <div class="field"><label for="ev-time">Time</label><input type="time" id="ev-time"></div>
-          <div class="field"><label for="ev-remind">Remind me</label><select id="ev-remind">
-            <option value="">No reminder</option><option value="0">At start</option><option value="5">5 min before</option><option value="15" selected>15 min before</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
         </div>
+        <fieldset class="remind-pick"><legend class="label">Remind me before it starts (pick as many as you like)</legend>
+          <div class="pills">${REMIND_OPTS.map(([m, l]) => `<label class="pill"><input type="checkbox" name="ev-remind" value="${m}" ${m === 15 ? "checked" : ""}><span>${l}</span></label>`).join("")}</div>
+        </fieldset>
         <div><button class="btn primary">Add event</button></div>
       </form>
     </section>
@@ -874,7 +891,11 @@ function go(v) { view = v; try { history.replaceState(null, "", "#" + v); } catc
 
 /* ---------- mutations ---------- */
 function addTask(t) { const task = { id: uid(), title: t.title, due: t.due || "", time: t.time || "", priority: t.priority || "med", remind: t.remind ?? !!t.time, done: false }; S.tasks.push(task); return task; }
-function addEvent(e) { const ev = { id: uid(), title: e.title, date: e.date || todayStr(), time: e.time || "", remind: e.remind === undefined ? (e.time ? 15 : null) : e.remind }; S.events.push(ev); return ev; }
+function addEvent(e) {
+  const r = e.remind === undefined ? (e.time ? [15] : []) : reminds(e);
+  const ev = { id: uid(), title: e.title, date: e.date || todayStr(), time: e.time || "", remind: [...new Set(r.map(Number).filter(n => n >= 0))].sort((a, b) => b - a) };
+  S.events.push(ev); return ev;
+}
 function appendNote(text, date = todayStr()) { const cur = S.notes[date]?.text || ""; const stamp = date === todayStr() ? `[${fmtTime(ymdTime(Date.now()))}] ` : ""; S.notes[date] = { text: (cur ? cur.replace(/\s+$/, "") + "\n" : "") + stamp + text, updated: Date.now() }; }
 function logCheckin(date, vals) { const c = S.checkins[date] = Object.assign({}, S.checkins[date] || {}); for (const k of ["mood", "energy", "sleep", "water", "exercise"]) if (vals[k] != null && !isNaN(vals[k])) c[k] = Number(vals[k]); return c; }
 
@@ -926,7 +947,7 @@ document.addEventListener("submit", e => {
   e.preventDefault();
   const v = id => (document.getElementById(id)?.value || "").trim();
   switch (f.dataset.form) {
-    case "addEvent": { if (!v("ev-title")) return; const r = v("ev-remind"); const ev = addEvent({ title: v("ev-title"), date: v("ev-date") || calSel, time: v("ev-time"), remind: r === "" ? null : +r }); calSel = ev.date; commit(); toast(`Added "${ev.title}" on ${fmtDay(ev.date)}`); break; }
+    case "addEvent": { if (!v("ev-title")) return; const r = [...f.querySelectorAll('input[name="ev-remind"]:checked')].map(i => +i.value); const ev = addEvent({ title: v("ev-title"), date: v("ev-date") || calSel, time: v("ev-time"), remind: r }); calSel = ev.date; commit(); toast(`Added "${ev.title}" on ${fmtDay(ev.date)}`); break; }
     case "addTask": { if (!v("tk-title")) return; const t = addTask({ title: v("tk-title"), due: v("tk-due"), time: v("tk-time"), priority: v("tk-pri"), remind: document.getElementById("tk-remind").checked }); taskFilter = "open"; commit(); setTimeout(() => $("#tk-title")?.focus()); break; }
     case "addHabit": { if (!v("hb-name")) return; S.habits.push({ id: uid(), name: v("hb-name"), log: {} }); commit(); break; }
     case "chat": { const t = v("chat-in"); if (t) handleChat(t); break; }
@@ -1086,7 +1107,7 @@ function localReply(raw) {
     const date = dPart.date || (tPart.time ? (dt(td, tPart.time) < Date.now() ? ymd(addDays(new Date(), 1)) : td) : (isEvent ? td : ""));
     if (isEvent) {
       const ev = addEvent({ title, date, time: tPart.time || "", remind: remindMin ?? (tPart.time ? 15 : null) });
-      return { text: `Added event "${ev.title}" on ${fmtDay(ev.date)}${ev.time ? " at " + fmtTime(ev.time) : ""}.${ev.remind != null ? ` I'll remind you ${fmtRemind(ev.remind)}.` : ""}`, changed: true };
+      return { text: `Added event "${ev.title}" on ${fmtDay(ev.date)}${ev.time ? " at " + fmtTime(ev.time) : ""}.${ev.time && reminds(ev).length ? ` I'll remind you ${fmtReminds(ev)}.` : ""}`, changed: true };
     }
     const t = addTask({ title, due: date, time: tPart.time || "", priority, remind: !!tPart.time });
     return { text: `Added task "${t.title}"${t.due ? ` for ${/^(Today|Tomorrow|Yesterday)$/.test(fmtDay(t.due)) ? fmtDay(t.due).toLowerCase() : fmtDay(t.due)}` : ""}${t.time ? " at " + fmtTime(t.time) + ". I'll remind you then" : ""}.${priority !== "med" ? ` Priority: ${priority}.` : ""}`, changed: true };
@@ -1115,8 +1136,8 @@ function dataSummary() {
 const TOOLS = [
   { name: "add_task", description: "Add a task to the user's tracker. Returns the new task id.", inputSchema: { type: "object", properties: { title: { type: "string" }, due: { type: "string", description: "YYYY-MM-DD, optional" }, time: { type: "string", description: "HH:MM 24h, optional; a time also sets a reminder" }, priority: { type: "string", enum: ["low", "med", "high"] } }, required: ["title"] },
     execute: i => { const t = addTask({ title: String(i.title), due: i.due ? String(i.due) : "", time: i.time ? String(i.time) : "", priority: ["low", "med", "high"].includes(i.priority) ? i.priority : "med" }); return { ok: true, id: t.id }; } },
-  { name: "add_event", description: "Add a calendar event. remind_minutes is how long before the start to remind (null for none). Returns the event id.", inputSchema: { type: "object", properties: { title: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string", description: "HH:MM 24h" }, remind_minutes: { type: ["number", "null"] } }, required: ["title", "date"] },
-    execute: i => { const e = addEvent({ title: String(i.title), date: String(i.date), time: i.time ? String(i.time) : "", remind: i.remind_minutes === undefined ? undefined : i.remind_minutes === null ? null : Number(i.remind_minutes) }); return { ok: true, id: e.id }; } },
+  { name: "add_event", description: "Add a calendar event. remind_minutes lists how many minutes before the start to remind (e.g. [1440, 30]; empty for none). Returns the event id.", inputSchema: { type: "object", properties: { title: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD" }, time: { type: "string", description: "HH:MM 24h" }, remind_minutes: { type: "array", items: { type: "number" } } }, required: ["title", "date"] },
+    execute: i => { const rm = i.remind_minutes; const e = addEvent({ title: String(i.title), date: String(i.date), time: i.time ? String(i.time) : "", remind: rm === undefined ? undefined : Array.isArray(rm) ? rm : rm === null ? [] : [Number(rm)] }); return { ok: true, id: e.id }; } },
   { name: "append_note", description: "Append text to the user's daily note for a date (default today).", inputSchema: { type: "object", properties: { text: { type: "string" }, date: { type: "string" } }, required: ["text"] },
     execute: i => { appendNote(String(i.text), i.date ? String(i.date) : todayStr()); return { ok: true }; } },
   { name: "complete_task", description: "Mark an open task as done by id.", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
