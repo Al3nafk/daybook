@@ -431,6 +431,10 @@ const VIEWS = [["today", "Today"], ["calendar", "Calendar"], ["tasks", "Tasks"],
 const LS_KEY = "daybook.v1";
 const STANDALONE = !window.claude; // running as the installed app rather than inside claude.ai
 let fbUser = null; // signed-in Firebase user (installed app only)
+// Android app (Capacitor): native screenshot watcher and updates from GitHub releases.
+const NATIVE = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
+const SHOTS = NATIVE && Capacitor.Plugins ? Capacitor.Plugins.Screenshots : null;
+let shotState = null, appUpdate = null;
 const IS_INSTALLED = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 let installEvt = null, showInstallHelp = false;
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; render(); });
@@ -812,6 +816,39 @@ document.addEventListener("paste", e => {
   const f = [...(e.clipboardData?.files || [])].find(x => x.type.startsWith("image/"));
   if (f && !(FB && !fbUser)) { e.preventDefault(); if (view !== "money") go("money"); handleImage(f, "paste"); }
 });
+// Android app: a payment screenshot the phone already read (from the notification or the Share menu).
+async function takeNativeShot() {
+  if (!SHOTS) return;
+  try {
+    const r = await SHOTS.takePending();
+    if (!r || r.text == null) return;
+    const { amount, merchant } = parseReceipt(r.text || "");
+    const amt = amount != null ? amount : r.amount ? +r.amount : null;
+    const when = new Date(r.time || Date.now());
+    if (receipt?.img) URL.revokeObjectURL(receipt.img);
+    receipt = { img: r.thumb || "", src: "screenshot", step: "ask", status: amt != null ? "done" : "failed", found: amt, amount: amt != null ? amt.toFixed(2) : "", merchant: merchant || "",
+      cat: "", note: "", date: ymd(when), time: ymdTime(when.getTime()), text: r.text };
+    receipt.cat = guessCat(receipt.merchant + " " + r.text);
+    if (view !== "money") go("money"); else render();
+  } catch {}
+}
+async function initNative() {
+  if (!NATIVE) return;
+  if (SHOTS) {
+    try { shotState = await SHOTS.status(); } catch {}
+    SHOTS.addListener("receipt", takeNativeShot);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) takeNativeShot(); });
+    takeNativeShot();
+    if (view === "money") render();
+  }
+  // New app versions are published as GitHub releases; offer the download when one is newer than this build.
+  try {
+    const rel = await (await fetch("https://api.github.com/repos/Al3nafk/daybook-android/releases/latest")).json();
+    const n = parseInt(String(rel.tag_name || "").split(".").pop(), 10);
+    if (n > (window.DAYBOOK_BUILD || 0)) { appUpdate = "https://github.com/Al3nafk/daybook-android/releases/latest/download/Daybook.apk"; render(); }
+  } catch {}
+}
+
 // Phone: a screenshot shared to Daybook arrives through the service worker.
 async function pickUpShare() {
   if (!/[?&]receipt=1/.test(location.search)) return;
@@ -834,7 +871,7 @@ function head(eyebrow, title, sub, right = "") {
   return `<header class="page-head"><div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ""}</div><div class="chips">${right}${syncChip()}</div></header>` + exampleBanner();
 }
 function installBtn(cls) {
-  if (!STANDALONE || IS_INSTALLED) return "";
+  if (!STANDALONE || IS_INSTALLED || NATIVE) return "";
   return installEvt ? `<button class="btn ${cls}" data-act="install">Install app</button>` : `<button class="btn ${cls}" data-act="installHelp">How to install</button>`;
 }
 function installSteps() {
@@ -847,7 +884,7 @@ function installSteps() {
   return ["Open this page on your phone in Chrome (Android) or Safari (iPhone).", "Use the browser menu: Install app or Add to Home Screen."];
 }
 function exampleBanner() {
-  return (showInstallHelp ? `<div class="banner"><div style="flex:1 1 260px"><strong>Install Daybook</strong><ol style="margin:6px 0 0;padding-left:20px">${installSteps().map(s => `<li>${esc(s)}</li>`).join("")}</ol></div><button class="btn small" data-act="closeInstall">Got it</button></div>` : "") + (S.example ? `<div class="banner"><p><strong>These are example entries</strong> so you can see how Daybook works. Nothing is saved until you change something or keep them.</p><button class="btn small primary" data-act="fresh">Start fresh</button><button class="btn small" data-act="keep">Keep examples</button></div>` : "");
+  return (appUpdate ? `<div class="banner"><p style="flex:1 1 220px"><strong>A new version of the Daybook app is ready.</strong> Download it and install it over this one. Your data stays.</p><a class="btn small primary" href="${appUpdate}" target="_blank" rel="noopener">Download update</a></div>` : "") + (showInstallHelp ? `<div class="banner"><div style="flex:1 1 260px"><strong>Install Daybook</strong><ol style="margin:6px 0 0;padding-left:20px">${installSteps().map(s => `<li>${esc(s)}</li>`).join("")}</ol></div><button class="btn small" data-act="closeInstall">Got it</button></div>` : "") + (S.example ? `<div class="banner"><p><strong>These are example entries</strong> so you can see how Daybook works. Nothing is saved until you change something or keep them.</p><button class="btn small primary" data-act="fresh">Start fresh</button><button class="btn small" data-act="keep">Keep examples</button></div>` : "");
 }
 function hero(eyebrow, title, sub) {
   return `<header class="hero"><div class="hero-text"><p class="eyebrow">${eyebrow}</p><h1>${title}</h1><p class="sub">${sub}</p>
@@ -981,7 +1018,7 @@ function viewMoney() {
   const td = todayStr(), st = spendStats(), b = +S.money.budget || 0, phone = /Android|iPhone|iPad/i.test(navigator.userAgent);
   const recent = [...S.spend].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).slice(0, 60);
   const days = []; for (const x of recent) { let g = days.find(d => d[0] === x.date); if (!g) days.push(g = [x.date, []]); g[1].push(x); }
-  const canClip = STANDALONE && !phone && !!navigator.clipboard?.read;
+  const canClip = STANDALONE && !NATIVE && !phone && !!navigator.clipboard?.read;
   const mo = new Date().toLocaleDateString(undefined, { month: "long" });
   return head("Money", "Spending", "Type in what you spend, or share a payment screenshot to Daybook and it reads the amount for you.") +
   `<div class="grid">
@@ -993,7 +1030,11 @@ function viewMoney() {
         <input type="text" id="mn-note" placeholder="Note, e.g. nasi lemak (picks a category for you)" autocomplete="off">
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn primary">Add spending</button>
           <label class="btn file-btn">Scan a screenshot<input type="file" id="mn-file" accept="image/*"></label></div>
-        <p class="hint">${phone ? "Quicker: after you screenshot a payment, tap <b>Share</b> and pick <b>Daybook</b>. It reads the amount and asks if you want to record it." : "Quicker: copy a payment screenshot and press <b>Ctrl+V</b> here. Daybook reads the amount and asks if you want to record it."}</p>
+        ${SHOTS ? (shotState?.watching
+          ? `<div class="banner" style="margin:0"><p style="flex:1 1 220px"><strong>Watching for payment screenshots.</strong> When you screenshot a payment, Daybook sends a notification asking if you want to record it.${shotState.notifications ? "" : " Notifications are off, so turn them on in Android settings."}</p><button type="button" class="btn small ghost" data-act="shotsOff">Turn off</button></div>`
+          : `<div class="banner" style="margin:0"><p style="flex:1 1 220px"><strong>Record payments from screenshots.</strong> Daybook can notice when you screenshot a payment and ask if you want to record it. It needs access to your photos and notifications. Screenshots are read on your phone and never uploaded.</p><button type="button" class="btn small primary" data-act="shotsOn">Turn on</button></div>`)
+        : ""}
+        ${SHOTS ? "" : `<p class="hint">${phone ? "Quicker: after you screenshot a payment, tap <b>Share</b> and pick <b>Daybook</b>. It reads the amount and asks if you want to record it." : "Quicker: copy a payment screenshot and press <b>Ctrl+V</b> here. Daybook reads the amount and asks if you want to record it."}</p>`}
         ${canClip ? `<label class="check"><input type="checkbox" id="mn-clip" ${pref("clipwatch") === "1" ? "checked" : ""}>Ask me when I come back to Daybook with a new screenshot copied</label>` : ""}
       </form>
       <div style="margin-top:18px">${days.length ? days.map(([d, arr]) => `<p class="group-label">${fmtDay(d)} · ${esc(money(sumOf(arr)))}</p><ul class="list">${arr.map(x => { const [, l, i] = catOf(x.cat);
@@ -1244,6 +1285,8 @@ const ACT = {
   delSub: b => { const t = S.tasks.find(x => x.id === b.dataset.id); const i = t?.subs?.findIndex(x => x.id === b.dataset.sub) ?? -1; if (i < 0) return; const [s] = t.subs.splice(i, 1); commit(); toast(`Deleted step "${s.title}"`, () => { t.subs.splice(i, 0, s); commit(); }); },
   delSpend: b => { const i = S.spend.findIndex(x => x.id === b.dataset.id); if (i < 0) return; const [x] = S.spend.splice(i, 1); commit(); toast(`Deleted ${money(x.amount)}`, () => { S.spend.splice(i, 0, x); commit(); }); },
   rcSkip: () => closeReceipt(),
+  shotsOn: async () => { try { shotState = await SHOTS.enable({ currency: S.money.currency }); if (!shotState.photos) toast("Daybook needs access to your photos to see new screenshots. You can allow it in Android settings."); } catch {} render(); },
+  shotsOff: async () => { try { shotState = await SHOTS.disable(); } catch {} render(); },
   rcSkipBg: () => closeReceipt(),
   rcBack: () => { receipt.step = "ask"; render(); },
   delTask: b => { const i = S.tasks.findIndex(x => x.id === b.dataset.id); if (i < 0) return; const [t] = S.tasks.splice(i, 1); commit(); toast(`Deleted "${t.title}"`, () => { S.tasks.splice(i, 0, t); commit(); }); },
@@ -1336,7 +1379,7 @@ document.addEventListener("submit", e => {
       if (receipt.img) URL.revokeObjectURL(receipt.img); receipt = null; commit();
       toast(`Recorded ${money(x.amount)} for ${catOf(x.cat)[1]}`, () => { S.spend = S.spend.filter(y => y.id !== x.id); commit(); }); break;
     }
-    case "moneySettings": { S.money.currency = v("mn-cur").toUpperCase() || "RM"; S.money.budget = Math.max(0, parseFloat(v("mn-budget")) || 0); commit(); toast("Saved"); break; }
+    case "moneySettings": { S.money.currency = v("mn-cur").toUpperCase() || "RM"; S.money.budget = Math.max(0, parseFloat(v("mn-budget")) || 0); SHOTS?.config({ currency: S.money.currency }).catch(() => {}); commit(); toast("Saved"); break; }
     case "addHabit": { if (!v("hb-name")) return; S.habits.push({ id: uid(), name: v("hb-name"), log: {} }); commit(); break; }
     case "chat": { const t = v("chat-in"); if (t) handleChat(t); break; }
     case "quickAsk": { const t = v("quick-ask"); if (t) { view = "ask"; handleChat(t); go("ask"); } break; }
@@ -1608,8 +1651,9 @@ setTimeout(tick, 1500);
 initStore();
 initSample();
 pickUpShare();
+initNative();
 })();
 </script>
 
-<script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js"));</script>
+<script>if ("serviceWorker" in navigator && !(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform())) addEventListener("load", () => navigator.serviceWorker.register("sw.js"));</script>
 </body></html>
