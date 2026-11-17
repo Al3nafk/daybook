@@ -134,6 +134,24 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .item .title{font-weight:600;overflow-wrap:anywhere}
 .item .meta{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
 .item.done .title{text-decoration:line-through;color:var(--muted)}
+.item.tree{flex-wrap:wrap}
+.icon-btn[aria-expanded="true"]{background:var(--surface-2);color:var(--accent)}
+.icon-btn .chev{width:12px;height:12px;transition:transform .15s}
+.icon-btn[aria-expanded="true"] .chev{transform:rotate(90deg)}
+.steps{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
+.steps.all{color:var(--good,#2e9e6a)}
+.subtree{flex-basis:100%;margin:2px 0 4px 34px;padding-left:14px;border-left:2px solid var(--line);display:grid;gap:2px}
+.subtree .sub{display:flex;align-items:center;gap:10px;padding:5px 0;min-width:0}
+.subtree .sub .tick{width:18px;height:18px}
+.subtree .sub .tick svg{width:11px;height:11px}
+.subtree .sub span{flex:1;min-width:0;overflow-wrap:anywhere;font-size:.92rem}
+.subtree .sub.done span{text-decoration:line-through;color:var(--muted)}
+.subtree .sub .icon-btn{width:26px;height:26px}
+.subtree form{display:flex;gap:8px;margin-top:4px}
+.subtree form input{flex:1;min-width:0;padding:7px 10px;font-size:.9rem}
+.bar{height:4px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:5px;max-width:180px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--hero-a),var(--hero-b))}
+@media (max-width:560px){.subtree{margin-left:8px}}
 .kind{width:4px;align-self:stretch;border-radius:4px;background:var(--accent);flex:none}
 .kind.task{background:var(--amber)}
 .tick{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);background:none;cursor:pointer;flex:none;display:grid;place-items:center;color:var(--accent-ink)}
@@ -377,6 +395,7 @@ const ICON = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
   left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>',
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg>',
+  tree: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v12a3 3 0 0 0 3 3h3M6 10h6"/><circle cx="16" cy="10" r="2.2"/><circle cx="16" cy="19" r="2.2"/></svg>',
 };
 const VIEWS = [["today", "Today"], ["calendar", "Calendar"], ["tasks", "Tasks"], ["notes", "Notes"], ["me", "Me"], ["ask", "Assistant"]];
 
@@ -402,7 +421,8 @@ function makeExample() {
     { id: uid(), title: "Family dinner", date: d(9), time: "19:00", remind: 60 },
   ];
   s.tasks = [
-    { id: uid(), title: "Submit lab report", due: d(0), time: "23:00", priority: "high", remind: true, done: false },
+    { id: uid(), title: "Submit lab report", due: d(0), time: "23:00", priority: "high", remind: true, done: false,
+      subs: [{ id: uid(), title: "Write up results", done: true }, { id: uid(), title: "Make the graphs", done: false }, { id: uid(), title: "Proofread and upload", done: false }] },
     { id: uid(), title: "Buy groceries", due: d(1), time: "", priority: "med", remind: false, done: false },
     { id: uid(), title: "Read chapter 4", due: d(3), time: "", priority: "low", remind: false, done: false },
     { id: uid(), title: "Pay phone bill", due: d(-1), time: "", priority: "med", remind: false, done: false },
@@ -436,6 +456,7 @@ let calSel = todayStr();
 let noteDate = todayStr();
 let meDate = todayStr();
 let taskFilter = "open";
+const openTree = new Set();
 let noteQuery = "";
 
 /* ---------- sync (account store, with on-device copy) ---------- */
@@ -678,12 +699,21 @@ function ring(pct, label) {
 }
 function agendaItem(a, opts = {}) {
   const isTask = a.kind === "task";
-  return `<li class="item ${isTask && a.done ? "done" : ""}">
+  const subs = isTask ? a.subs || [] : [], sd = subs.filter(s => s.done).length;
+  const open = opts.tree && openTree.has(a.id);
+  const tree = !open ? "" : `<div class="subtree" id="tree-${a.id}">
+      ${subs.map(s => `<div class="sub ${s.done ? "done" : ""}"><button class="tick" data-act="toggleSub" data-id="${a.id}" data-sub="${s.id}" aria-pressed="${!!s.done}" aria-label="Mark ${esc(s.title)} done">${s.done ? ICON.check : ""}</button><span>${esc(s.title)}</span><button class="icon-btn" data-act="delSub" data-id="${a.id}" data-sub="${s.id}" aria-label="Delete step ${esc(s.title)}">${ICON.trash}</button></div>`).join("")}
+      <form data-form="addSub" data-id="${a.id}"><input type="text" name="sub" placeholder="${subs.length ? "Add another step…" : "Break it into steps…"}" aria-label="New step for ${esc(a.title)}" autocomplete="off" required><button class="btn small">Add</button></form>
+    </div>`;
+  return `<li class="item ${isTask && a.done ? "done" : ""} ${open ? "tree" : ""}">
     ${isTask ? `<button class="tick" data-act="toggleTask" data-id="${a.id}" aria-pressed="${!!a.done}" aria-label="Mark ${esc(a.title)} done">${a.done ? ICON.check : ""}</button>` : `<span class="kind"></span>`}
     <span class="time">${a.time ? fmtTime(a.time) : isTask ? "Any time" : "All day"}</span>
     <div class="body"><div class="title">${esc(a.title)}</div><div class="meta">${isTask ? `<span class="pri ${a.priority}">${a.priority === "med" ? "medium" : a.priority}</span>` : "<span>Event</span>"}
-      ${(isTask ? a.remind && a.time : reminds(a).length) ? `<span class="bell">${ICON.bell}${isTask ? "at due time" : fmtReminds(a)}</span>` : ""}${opts.day ? `<span>${fmtDay(a.due || a.date)}</span>` : ""}</div></div>
-    ${opts.del ? `<button class="icon-btn" data-act="${isTask ? "delTask" : "delEvent"}" data-id="${a.id}" aria-label="Delete ${esc(a.title)}">${ICON.trash}</button>` : ""}</li>`;
+      ${subs.length ? `<span class="steps ${sd === subs.length ? "all" : ""}">${sd}/${subs.length} steps</span>` : ""}
+      ${(isTask ? a.remind && a.time : reminds(a).length) ? `<span class="bell">${ICON.bell}${isTask ? "at due time" : fmtReminds(a)}</span>` : ""}${opts.day ? `<span>${fmtDay(a.due || a.date)}</span>` : ""}</div>
+      ${subs.length && !a.done ? `<div class="bar"><i style="width:${Math.round(100 * sd / subs.length)}%"></i></div>` : ""}</div>
+    ${opts.tree ? `<button class="icon-btn" data-act="tree" data-id="${a.id}" aria-expanded="${open}" aria-controls="tree-${a.id}" aria-label="${open ? "Hide" : "Show"} steps for ${esc(a.title)}" title="${subs.length ? "Steps" : "Add steps"}">${subs.length ? `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg>` : ICON.tree}</button>` : ""}
+    ${opts.del ? `<button class="icon-btn" data-act="${isTask ? "delTask" : "delEvent"}" data-id="${a.id}" aria-label="Delete ${esc(a.title)}">${ICON.trash}</button>` : ""}${tree}</li>`;
 }
 
 function viewToday() {
@@ -786,10 +816,10 @@ function viewTasks() {
     ["No date", open.filter(t => !t.due)],
   ];
   const list = taskFilter === "open"
-    ? (open.length ? groups.filter(g => g[1].length).map(([l, arr, c]) => `<p class="group-label ${c || ""}">${l} · ${arr.length}</p><ul class="list">${arr.sort(byDue).map(t => agendaItem({ kind: "task", ...t }, { del: true, day: l !== "Today" && l !== "No date" })).join("")}</ul>`).join("") : `<p class="empty">All clear. Add a task above.</p>`)
-    : (done.length ? `<ul class="list">${done.map(t => agendaItem({ kind: "task", ...t }, { del: true, day: true })).join("")}</ul>` : `<p class="empty">Nothing finished yet.</p>`);
+    ? (open.length ? groups.filter(g => g[1].length).map(([l, arr, c]) => `<p class="group-label ${c || ""}">${l} · ${arr.length}</p><ul class="list">${arr.sort(byDue).map(t => agendaItem({ kind: "task", ...t }, { del: true, tree: true, day: l !== "Today" && l !== "No date" })).join("")}</ul>`).join("") : `<p class="empty">All clear. Add a task above.</p>`)
+    : (done.length ? `<ul class="list">${done.map(t => agendaItem({ kind: "task", ...t }, { del: true, tree: true, day: true })).join("")}</ul>` : `<p class="empty">Nothing finished yet.</p>`);
   const days = lastDays(7);
-  return head("Tracker", "Tasks & habits", "Tasks have a due date and an optional reminder. Habits are things you want to do every day.") +
+  return head("Tracker", "Tasks & habits", "Tasks have a due date and an optional reminder. Tap the steps button on a task to break it into smaller steps. Habits are things you want to do every day.") +
   `<div class="grid">
     <section class="panel span-7">
       <form data-form="addTask" style="display:grid;gap:10px">
@@ -975,7 +1005,8 @@ function render() {
 function go(v) { view = v; try { history.replaceState(null, "", "#" + v); } catch {} render(); scrollTo(0, 0); }
 
 /* ---------- mutations ---------- */
-function addTask(t) { const task = { id: uid(), title: t.title, due: t.due || "", time: t.time || "", priority: t.priority || "med", remind: t.remind ?? !!t.time, done: false }; S.tasks.push(task); return task; }
+function addTask(t) { const task = { id: uid(), title: t.title, due: t.due || "", time: t.time || "", priority: t.priority || "med", remind: t.remind ?? !!t.time, done: false, subs: [] }; S.tasks.push(task); return task; }
+function addSub(t, title) { const s = { id: uid(), title, done: false }; (t.subs ||= []).push(s); if (t.done) { t.done = false; t.doneAt = null; } return s; }
 function addEvent(e) {
   const r = e.remind === undefined ? (e.time ? [15] : []) : reminds(e);
   const ev = { id: uid(), title: e.title, date: e.date || todayStr(), time: e.time || "", remind: [...new Set(r.map(Number).filter(n => n >= 0))].sort((a, b) => b - a) };
@@ -989,6 +1020,16 @@ const ACT = {
   fresh: () => { S = EMPTY(); S.chat = [{ role: "assistant", content: "Fresh start. Tell me what's coming up and I'll keep track of it.", source: "offline", ts: Date.now() }]; commit(); },
   keep: () => commit(),
   toggleTask: b => { const t = S.tasks.find(x => x.id === b.dataset.id); if (!t) return; t.done = !t.done; t.doneAt = t.done ? Date.now() : null; commit(); },
+  tree: b => { const id = b.dataset.id; if (openTree.has(id)) openTree.delete(id); else openTree.add(id); render(); if (openTree.has(id)) setTimeout(() => $(`#tree-${id} input`)?.focus()); },
+  toggleSub: b => {
+    const t = S.tasks.find(x => x.id === b.dataset.id), s = t?.subs?.find(x => x.id === b.dataset.sub); if (!s) return;
+    s.done = !s.done;
+    if (s.done && !t.done && t.subs.every(x => x.done)) {
+      t.done = true; t.doneAt = Date.now(); commit();
+      toast(`All steps done, so "${t.title}" is done`, () => { t.done = false; t.doneAt = null; commit(); });
+    } else commit();
+  },
+  delSub: b => { const t = S.tasks.find(x => x.id === b.dataset.id); const i = t?.subs?.findIndex(x => x.id === b.dataset.sub) ?? -1; if (i < 0) return; const [s] = t.subs.splice(i, 1); commit(); toast(`Deleted step "${s.title}"`, () => { t.subs.splice(i, 0, s); commit(); }); },
   delTask: b => { const i = S.tasks.findIndex(x => x.id === b.dataset.id); if (i < 0) return; const [t] = S.tasks.splice(i, 1); commit(); toast(`Deleted "${t.title}"`, () => { S.tasks.splice(i, 0, t); commit(); }); },
   delEvent: b => { const i = S.events.findIndex(x => x.id === b.dataset.id); if (i < 0) return; const [e] = S.events.splice(i, 1); commit(); toast(`Deleted "${e.title}"`, () => { S.events.splice(i, 0, e); commit(); }); },
   toggleHabit: b => { const h = S.habits.find(x => x.id === b.dataset.id); if (!h) return; const d = b.dataset.date; if (h.log[d]) delete h.log[d]; else h.log[d] = true; commit(); },
@@ -1041,6 +1082,7 @@ document.addEventListener("submit", e => {
   switch (f.dataset.form) {
     case "addEvent": { if (!v("ev-title")) return; const r = [...f.querySelectorAll('input[name="ev-remind"]:checked')].map(i => +i.value); const ev = addEvent({ title: v("ev-title"), date: v("ev-date") || calSel, time: v("ev-time"), remind: r }); calSel = ev.date; commit(); toast(`Added "${ev.title}" on ${fmtDay(ev.date)}`); break; }
     case "addTask": { if (!v("tk-title")) return; const t = addTask({ title: v("tk-title"), due: v("tk-due"), time: v("tk-time"), priority: v("tk-pri"), remind: document.getElementById("tk-remind").checked }); taskFilter = "open"; commit(); setTimeout(() => $("#tk-title")?.focus()); break; }
+    case "addSub": { const t = S.tasks.find(x => x.id === f.dataset.id), title = (f.elements.sub.value || "").trim(); if (!t || !title) return; addSub(t, title); commit(); setTimeout(() => $(`#tree-${t.id} input`)?.focus()); break; }
     case "addHabit": { if (!v("hb-name")) return; S.habits.push({ id: uid(), name: v("hb-name"), log: {} }); commit(); break; }
     case "chat": { const t = v("chat-in"); if (t) handleChat(t); break; }
     case "quickAsk": { const t = v("quick-ask"); if (t) { view = "ask"; handleChat(t); go("ask"); } break; }
@@ -1229,7 +1271,7 @@ function dataSummary() {
   const td = todayStr(), end = ymd(addDays(new Date(), 14));
   return JSON.stringify({
     events: S.events.filter(e => e.date >= td && e.date <= end).map(({ id, title, date, time }) => ({ id, title, date, time })),
-    openTasks: S.tasks.filter(t => !t.done).map(({ id, title, due, time, priority }) => ({ id, title, due, time, priority })),
+    openTasks: S.tasks.filter(t => !t.done).map(({ id, title, due, time, priority, subs }) => ({ id, title, due, time, priority, ...(subs?.length ? { steps: subs.map(x => ({ title: x.title, done: !!x.done })) } : {}) })),
     habits: S.habits.map(h => ({ name: h.name, doneToday: !!h.log[td], streak: streak(h) })),
     checkinsLast7: Object.fromEntries(lastDays(7).filter(d => S.checkins[d]).map(d => [d, S.checkins[d]])),
     todayNote: (S.notes[td]?.text || "").slice(0, 1500),
@@ -1244,6 +1286,8 @@ const TOOLS = [
     execute: i => { appendNote(String(i.text), i.date ? String(i.date) : todayStr()); return { ok: true }; } },
   { name: "complete_task", description: "Mark an open task as done by id.", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
     execute: i => { const t = S.tasks.find(x => x.id === String(i.id)); if (!t) throw new Error("No task with that id"); t.done = true; t.doneAt = Date.now(); return { ok: true }; } },
+  { name: "add_subtask", description: "Add a step (subtask) under an existing task, by the task id.", inputSchema: { type: "object", properties: { task_id: { type: "string" }, title: { type: "string" } }, required: ["task_id", "title"] },
+    execute: i => { const t = S.tasks.find(x => x.id === String(i.task_id)); if (!t) throw new Error("No task with that id"); addSub(t, String(i.title)); return { ok: true }; } },
   { name: "log_checkin", description: "Log self-monitoring values for a date (default today): mood 1-5, energy 1-5, sleep hours, water glasses, exercise minutes.", inputSchema: { type: "object", properties: { date: { type: "string" }, mood: { type: "number" }, energy: { type: "number" }, sleep: { type: "number" }, water: { type: "number" }, exercise: { type: "number" } } },
     execute: i => { logCheckin(i.date ? String(i.date) : todayStr(), i); return { ok: true }; } },
 ];
