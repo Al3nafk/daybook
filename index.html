@@ -149,9 +149,35 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .subtree .sub .icon-btn{width:26px;height:26px}
 .subtree form{display:flex;gap:8px;margin-top:4px}
 .subtree form input{flex:1;min-width:0;padding:7px 10px;font-size:.9rem}
-.bar{height:4px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:5px;max-width:180px}
-.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--hero-a),var(--hero-b))}
+.prog{height:4px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin-top:5px;max-width:180px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--hero-a),var(--hero-b))}
 @media (max-width:560px){.subtree{margin-left:8px}}
+/* money */
+.amt{font-family:var(--f-display);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cat-ico{width:34px;height:34px;flex:none;border-radius:12px;display:grid;place-items:center;background:var(--surface-2);font-size:1.05rem}
+.money-in{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:16px;padding:6px 14px;background:var(--surface)}
+.money-in span{font-family:var(--f-display);font-weight:700;color:var(--muted)}
+.money-in input{border:0;background:none;box-shadow:none;font-family:var(--f-display);font-size:1.6rem;font-weight:700;padding:4px 0;min-width:0;width:100%;outline:none}
+.money-in:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+.cat-bars{display:grid;gap:10px}
+.cat-bar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-size:.88rem}
+.cat-bar .prog{grid-column:1/-1;max-width:none;height:6px;margin:0}
+.hint{font-size:.8rem;color:var(--muted);margin:0}
+.file-btn{position:relative}
+.file-btn input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.sheet-wrap{position:fixed;inset:0;z-index:60;display:grid;place-items:end center;background:color-mix(in srgb,#120a24 45%,transparent);padding:12px;padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+.sheet{width:min(520px,100%);max-height:calc(100dvh - 24px);overflow:auto;display:grid;gap:14px;padding:20px;border-radius:26px;background:var(--surface);border:1px solid var(--glass-line);box-shadow:0 30px 60px -20px rgba(20,8,50,.5);animation:sheet-up .22s ease-out}
+@keyframes sheet-up{from{transform:translateY(24px);opacity:0}}
+@media (min-width:821px){.sheet-wrap{place-items:center}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.sheet h2{font-family:var(--f-display);font-size:1.25rem;margin:2px 0 0}
+.rc-top{display:flex;gap:14px;align-items:flex-start;min-width:0}
+.rc-img{width:72px;max-height:128px;object-fit:cover;object-position:top;border-radius:12px;border:1px solid var(--line);flex:none}
+.rc-status{font-size:.86rem;color:var(--muted);margin:6px 0 0;display:flex;gap:8px;align-items:center}
+.rc-status.good{color:var(--accent)}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sheet .row{display:flex;flex-wrap:wrap;gap:8px}
 .kind{width:4px;align-self:stretch;border-radius:4px;background:var(--accent);flex:none}
 .kind.task{background:var(--amber)}
 .tick{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);background:none;cursor:pointer;flex:none;display:grid;place-items:center;color:var(--accent-ink)}
@@ -310,7 +336,7 @@ textarea{background:var(--surface);border-radius:18px;padding:14px 16px}
 @keyframes breathe{50%{transform:scale(1.09)}}
 @media (prefers-reduced-motion:reduce){.orb-dots,.orb.busy .orb-core{animation:none}}
 
-.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .tile{display:grid;justify-items:start;gap:6px;padding:16px;text-align:left;cursor:pointer;background:var(--glass);border:1px solid var(--glass-line);border-radius:22px;box-shadow:var(--shadow);min-width:0}
 .tile:hover{border-color:var(--peri)}
 .tile b{font-family:var(--f-display);font-weight:600;font-size:1rem}
@@ -343,6 +369,7 @@ textarea{background:var(--surface);border-radius:18px;padding:14px 16px}
   .hero{padding:22px}
   .hero h1{font-size:2rem}
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tiles .tile:nth-child(5){grid-column:span 2}
   .toasts{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
   .item .time{width:62px}
 }
@@ -395,9 +422,10 @@ const ICON = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
   left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>',
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg>',
+  money: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 15h2"/></svg>',
   tree: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v12a3 3 0 0 0 3 3h3M6 10h6"/><circle cx="16" cy="10" r="2.2"/><circle cx="16" cy="19" r="2.2"/></svg>',
 };
-const VIEWS = [["today", "Today"], ["calendar", "Calendar"], ["tasks", "Tasks"], ["notes", "Notes"], ["me", "Me"], ["ask", "Assistant"]];
+const VIEWS = [["today", "Today"], ["calendar", "Calendar"], ["tasks", "Tasks"], ["money", "Money"], ["notes", "Notes"], ["me", "Me"], ["ask", "Assistant"]];
 
 /* ---------- state ---------- */
 const LS_KEY = "daybook.v1";
@@ -408,7 +436,7 @@ let installEvt = null, showInstallHelp = false;
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; render(); });
 addEventListener("appinstalled", () => { installEvt = null; showInstallHelp = false; toast("Daybook is on your home screen"); render(); });
 const EMPTY = () => ({ v: 1, updated: 0, example: false, notes: {}, noteReminder: { enabled: true, time: "21:30" },
-  tasks: [], habits: [], events: [], checkins: {}, chat: [], fired: {} });
+  tasks: [], habits: [], events: [], checkins: {}, chat: [], fired: {}, spend: [], money: { currency: "RM", budget: 0 } });
 
 function makeExample() {
   const t = new Date(), d = n => ymd(addDays(t, n)), s = EMPTY();
@@ -436,12 +464,17 @@ function makeExample() {
   ];
   const moods = [3, 4, 3, 2, 3, 4, 4, 5, 3, 3, 4, 4, 5], sleep = [6.5, 7, 6, 5, 6.5, 7.5, 8, 8, 6, 6.5, 7, 7.5, 7];
   moods.forEach((m, i) => { s.checkins[d(i - 13)] = { mood: m, energy: Math.max(1, Math.min(5, m + (i % 3 === 0 ? -1 : 0))), sleep: sleep[i], water: 4 + (i % 4), exercise: [0, 30, 20, 0, 45, 30, 0][i % 7] }; });
+  const sp = (amount, cat, note, merchant, day, time, src = "manual") => ({ id: uid(), amount, cat, note, merchant, date: d(day), time, src });
+  s.spend = [sp(12.5, "food", "Nasi lemak and teh tarik", "", 0, "08:40"), sp(8.6, "transport", "Ride to campus", "Grab", 0, "09:20", "screenshot"),
+    sp(45.9, "groceries", "Weekly groceries", "Jaya Grocer", -1, "18:10", "screenshot"), sp(15, "food", "Lunch", "", -2, "13:05"),
+    sp(29.9, "shopping", "Phone case", "Shopee", -3, "21:40"), sp(60, "bills", "Phone bill", "Maxis", -5, "10:00"), sp(18, "fun", "Movie", "GSC", -6, "20:15")];
+  s.money = { currency: "RM", budget: 800 };
   s.notes[d(-1)] = { text: "Finished the linked list assignment early. Felt good after the walk.\nTomorrow: start the lab report before lunch.", updated: Date.now() };
   s.notes[d(-3)] = { text: "Slept badly. Skipped gym, did stretching instead. Need to drink more water.", updated: Date.now() };
   s.chat = [{ role: "assistant", content: "Hi! I can add tasks and events, keep notes, log how you feel and tell you what's coming up. Try \"remind me to call mum tomorrow at 7pm\".", source: "offline", ts: Date.now() }];
   return s;
 }
-function normalize(s) { const e = EMPTY(); const o = Object.assign(e, s || {}); o.noteReminder = Object.assign(EMPTY().noteReminder, o.noteReminder || {}); return o; }
+function normalize(s) { const e = EMPTY(); const o = Object.assign(e, s || {}); o.noteReminder = Object.assign(EMPTY().noteReminder, o.noteReminder || {}); o.money = Object.assign(EMPTY().money, o.money || {}); if (!Array.isArray(o.spend)) o.spend = []; return o; }
 // Each signed-in user gets their own on-device copy; the unsigned key is the pre-accounts copy.
 function lsKey() { return fbUser ? LS_KEY + "." + fbUser.uid : LS_KEY; }
 function loadLocal() { try { const r = localStorage.getItem(lsKey()); return r ? normalize(JSON.parse(r)) : null; } catch { return null; } }
@@ -457,6 +490,7 @@ let noteDate = todayStr();
 let meDate = todayStr();
 let taskFilter = "open";
 const openTree = new Set();
+let receipt = null, mnPicked = false; // a payment screenshot waiting to be recorded
 let noteQuery = "";
 
 /* ---------- sync (account store, with on-device copy) ---------- */
@@ -651,6 +685,144 @@ function toast(text, undo) {
   box.appendChild(el); setTimeout(() => el.remove(), 5000);
 }
 
+/* ---------- money ---------- */
+const CATS = [["food", "Food", "🍜"], ["groceries", "Groceries", "🛒"], ["transport", "Transport", "🚗"], ["shopping", "Shopping", "🛍️"], ["bills", "Bills", "🧾"], ["fun", "Fun", "🎬"], ["health", "Health", "💊"], ["study", "Study", "📚"], ["other", "Other", "✨"]];
+const catOf = k => CATS.find(c => c[0] === k) || CATS[CATS.length - 1];
+const CAT_WORDS = {
+  food: /grab ?food|foodpanda|shopee ?food|mcd|mcdonald|kfc|pizza|burger|subway|restaurant|restoran|cafe|café|coffee|kopi|starbucks|zus|tealive|chagee|bakery|nasi|mee |mamak|food|lunch|dinner|breakfast|brunch|supper|makan|sushi|chicken|boba|bubble tea|snack|roti|teh /i,
+  groceries: /grocer|supermarket|mydin|aeon|lotus|tesco|giant|speedmart|family ?mart|7-?eleven|kk ?mart|econsave|nsk|fresh market|pasar/i,
+  transport: /\bgrab\b(?! ?food)|grabcar|bolt|maxim|indrive|petronas|shell|petron|caltex|bhp|fuel|petrol|parking|toll|\blrt\b|\bmrt\b|ktm|rapid ?kl|\bbus\b|train|taxi|e-hailing|airasia|flight|ride/i,
+  shopping: /shopee|lazada|tiktok shop|zalora|uniqlo|h&m|ikea|mr ?diy|daiso|cotton on|padini|shirt|shoes|clothes/i,
+  bills: /tnb|tenaga|unifi|maxis|celcom|digi|u ?mobile|hotlink|astro|air selangor|indah water|insurance|rent|sewa|bill|postpaid|prepaid|wifi|internet/i,
+  fun: /gsc|tgv|mbo|cinema|movie|netflix|spotify|youtube|disney|steam|playstation|game|concert|karaoke|bowling/i,
+  health: /clinic|klinik|pharmacy|farmasi|hospital|dental|doctor|alpro|caring|guardian|watsons|medicine|ubat|gym|fitness/i,
+  study: /book|popular|mph|kinokuniya|stationery|tuition|course|udemy|print|photostat|fees|yuran|textbook/i,
+};
+function money(n) { return `${S.money.currency} ${Number(n || 0).toFixed(2)}`; }
+function guessCat(text) {
+  const t = String(text || "").toLowerCase(); if (!t.trim()) return "";
+  const word = w => new RegExp("(^|[^\\p{L}\\p{N}])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "($|[^\\p{L}\\p{N}])", "u");
+  for (const x of [...S.spend].reverse()) if (x.merchant && x.merchant.length > 2 && word(x.merchant.toLowerCase()).test(t)) return x.cat; // learn from past entries
+  for (const [k, re] of Object.entries(CAT_WORDS)) if (re.test(t + " ")) return k;
+  return "";
+}
+function addSpend(x) {
+  const now = new Date();
+  const e = { id: uid(), amount: Math.round(Number(x.amount) * 100) / 100, cat: catOf(x.cat)[0], note: (x.note || "").trim(), merchant: (x.merchant || "").trim(), date: x.date || todayStr(), time: x.time || ymdTime(now.getTime()), src: x.src || "manual" };
+  S.spend.push(e); return e;
+}
+const sumOf = arr => arr.reduce((a, x) => a + (x.amount || 0), 0);
+function spendStats() {
+  const td = todayStr(), wk = ymd(addDays(new Date(), -6)), mo = td.slice(0, 7);
+  const month = S.spend.filter(x => x.date.startsWith(mo));
+  const byCat = {}; for (const x of month) byCat[x.cat] = (byCat[x.cat] || 0) + x.amount;
+  return { today: sumOf(S.spend.filter(x => x.date === td)), week: sumOf(S.spend.filter(x => x.date >= wk && x.date <= td)), month: sumOf(month), byCat: Object.entries(byCat).sort((a, b) => b[1] - a[1]) };
+}
+// Reads the amount (and who was paid) from the text of a payment screenshot.
+function parseReceipt(text) {
+  const lines = String(text).replace(/(\d)\s*[,.]\s*(\d{2})(?!\d)/g, "$1.$2").split(/\n+/).map(l => l.trim()).filter(Boolean);
+  const cur = "(?:RM|MYR|SGD|S\\$|USD|US\\$|\\$|€|£|¥|₩|฿|Rp|PHP|₱)", num = "(\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)";
+  const before = new RegExp(cur + "\\s*[-−–]?\\s*" + num, "i"), after = new RegExp(num + "\\s*" + cur + "(?![a-z])", "i");
+  let best = null;
+  lines.forEach((l, i) => {
+    const m = l.match(before) || l.match(after); if (!m) return;
+    const v = parseFloat(m[1].replace(/,/g, "")); if (!(v > 0 && v < 1e6)) return;
+    let score = /\.\d{2}$/.test(m[1]) ? 1 : 0;
+    if (/total|amount|paid|payment|jumlah|bayaran|successful|berjaya|debit|pay /i.test(l + " " + (lines[i - 1] || ""))) score += 2;
+    if (/(^|[^b])total|grand total|amount paid|you paid|jumlah besar/i.test(l)) score += 1;
+    if (/sub-?total|delivery|service|tax|sst|fee/i.test(l)) score -= 2;
+    if (/balance|baki|cashback|points?|reward|saved|discount|voucher|limit|fee waived/i.test(l)) score -= 3;
+    if (!best || score > best.score) best = { v, score };
+  });
+  if (!best) for (const l of lines) { if (/balance|baki|\d{1,2}:\d{2}|\d{4}[-/]\d{2}/i.test(l)) continue; const m = l.match(/(?:^|\s)(\d{1,5}\.\d{2})(?!\d)/); if (m) { best = { v: parseFloat(m[1]) }; break; } }
+  let merchant = "";
+  for (let i = 0; i < lines.length && !merchant; i++) {
+    const m = lines[i].match(/^(?:paid to|pay to|payment to|transfer(?:red)? to|sent to|recipient|merchant(?: name)?|to|kepada|penerima|bayar kepada)\b\s*[:\-]?\s*(.*)$/i);
+    if (m) merchant = (m[1] || lines[i + 1] || "").replace(/[^\p{L}\p{N}&'.\- ]/gu, "").trim().slice(0, 40);
+  }
+  return { amount: best ? best.v : null, merchant };
+}
+let ocrP = null;
+function loadOCR() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  return ocrP ||= new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+    sc.onload = () => window.Tesseract ? res(window.Tesseract) : rej(new Error("reader missing"));
+    sc.onerror = () => { ocrP = null; rej(new Error("reader unavailable")); };
+    document.head.appendChild(sc);
+    setTimeout(() => { if (!window.Tesseract) { ocrP = null; rej(new Error("timed out")); } }, 25000);
+  });
+}
+function handleImage(blob, src) {
+  if (!blob || !/^image\//.test(blob.type || "image/")) return;
+  if (receipt?.img) URL.revokeObjectURL(receipt.img);
+  const now = new Date();
+  receipt = { img: URL.createObjectURL(blob), blob, src, step: "ask", status: "reading", amount: "", merchant: "", cat: "", note: "", date: todayStr(), time: ymdTime(now.getTime()) };
+  render(); readReceipt(receipt);
+}
+async function readReceipt(r) {
+  try {
+    const T = await loadOCR();
+    const { data } = await T.recognize(r.blob, "eng");
+    if (r !== receipt) return;
+    const { amount, merchant } = parseReceipt(data.text || "");
+    r.text = data.text || "";
+    if (amount != null && !r.touched) r.amount = amount.toFixed(2);
+    if (merchant && !r.merchant) r.merchant = merchant;
+    if (!r.catPicked) r.cat = guessCat(merchant + " " + r.text) || r.cat;
+    r.found = amount; r.status = amount != null ? "done" : "failed";
+  } catch (e) { if (r !== receipt) return; r.status = "failed"; r.why = navigator.onLine ? "" : "the reader needs internet the first time"; }
+  if (r.step === "ask") { const keep = document.activeElement?.id; render(); if (keep) document.getElementById(keep)?.focus(); }
+  if (document.hidden && r.found != null && "Notification" in window && Notification.permission === "granted" && navigator.serviceWorker)
+    navigator.serviceWorker.ready.then(reg => reg.showNotification(`Record ${money(r.found)} in Daybook?`, { body: r.merchant ? `Paid to ${r.merchant}. Tap to choose what it was for.` : "Tap to choose what it was for.", tag: "receipt", icon: "icon-192.png", badge: "icon-192.png" })).catch(() => {});
+}
+function closeReceipt() { if (receipt?.img) URL.revokeObjectURL(receipt.img); receipt = null; render(); }
+function catPills(name, sel) { return `<div class="pills">${CATS.map(([k, l, i]) => `<label class="pill"><input type="radio" name="${name}" value="${k}" ${sel === k ? "checked" : ""}><span>${i} ${l}</span></label>`).join("")}</div>`; }
+function receiptSheet() {
+  const r = receipt; if (!r) return "";
+  const status = r.status === "reading" ? `<p class="rc-status"><span class="spin"></span>Reading the amount…</p>`
+    : r.status === "done" ? `<p class="rc-status good">Found ${esc(money(r.found))}${r.merchant ? " · " + esc(r.merchant) : ""}. Check it's right.</p>`
+    : `<p class="rc-status">I couldn't read the amount${r.why ? ` (${esc(r.why)})` : ""}. Type it in.</p>`;
+  const ask = r.step === "ask";
+  return `<div class="sheet-wrap" data-act="rcSkipBg"><form class="sheet" data-form="receipt" role="dialog" aria-modal="true" aria-labelledby="rc-h">
+    <div class="rc-top">${r.img ? `<img class="rc-img" src="${r.img}" alt="Your payment screenshot">` : ""}<div style="min-width:0"><p class="eyebrow">${ask ? "Payment screenshot" : esc(money(r.amount)) + (r.merchant ? " · " + esc(r.merchant) : "")}</p>
+      <h2 id="rc-h">${ask ? "Record this in Daybook?" : "What did you spend it on?"}</h2>${ask ? status : ""}</div></div>
+    ${ask ? `<div class="form-row"><div class="field" style="flex:1 1 140px"><label for="rc-amount">Amount</label><div class="money-in"><span>${esc(S.money.currency)}</span><input id="rc-amount" inputmode="decimal" placeholder="0.00" value="${esc(r.amount)}" autocomplete="off"></div></div>
+        <div class="field" style="flex:1 1 160px"><label for="rc-merchant">Paid to</label><input type="text" id="rc-merchant" value="${esc(r.merchant)}" placeholder="Shop or person" autocomplete="off"></div></div>
+      <div class="row"><button class="btn primary">Yes, record it</button><button type="button" class="btn ghost" data-act="rcSkip">Not now</button></div>`
+    : `<fieldset class="remind-pick"><legend class="label">Category</legend>${catPills("rc-cat", r.cat || "food")}</fieldset>
+      <div class="field"><label for="rc-note">Note</label><input type="text" id="rc-note" value="${esc(r.note)}" placeholder="e.g. lunch with Aina" autocomplete="off"></div>
+      <div class="field" style="max-width:200px"><label for="rc-date">Date</label><input type="date" id="rc-date" value="${r.date}" max="${todayStr()}"></div>
+      <div class="row"><button class="btn primary">Save</button><button type="button" class="btn ghost" data-act="rcBack">Back</button></div>`}
+  </form></div>`;
+}
+// Computer: notice a newly copied screenshot when you come back to Daybook (asks for clipboard permission once).
+async function clipSig() {
+  const items = await navigator.clipboard.read();
+  for (const it of items) { const type = it.types.find(t => t.startsWith("image/")); if (type) { const b = await it.getType(type); const head = new Uint8Array(await b.slice(0, 4096).arrayBuffer()); let h = b.size; for (const x of head) h = (h * 31 + x) | 0; return { blob: b, sig: String(h) }; } }
+  return null;
+}
+async function checkClipboard() {
+  if (pref("clipwatch") !== "1" || receipt || !navigator.clipboard?.read || (FB && !fbUser)) return;
+  try { const c = await clipSig(); if (c && c.sig !== pref("clipsig")) { pref("clipsig", c.sig); if (view !== "money") go("money"); handleImage(c.blob, "clipboard"); } } catch {}
+}
+addEventListener("focus", () => setTimeout(checkClipboard, 300));
+document.addEventListener("paste", e => {
+  const f = [...(e.clipboardData?.files || [])].find(x => x.type.startsWith("image/"));
+  if (f && !(FB && !fbUser)) { e.preventDefault(); if (view !== "money") go("money"); handleImage(f, "paste"); }
+});
+// Phone: a screenshot shared to Daybook arrives through the service worker.
+async function pickUpShare() {
+  if (!/[?&]receipt=1/.test(location.search)) return;
+  try { history.replaceState(null, "", location.pathname + "#money"); } catch {}
+  view = "money";
+  try {
+    const c = await caches.open("daybook-share"), res = await c.match("shared-receipt");
+    if (res) { const b = await res.blob(); await c.delete("shared-receipt"); handleImage(b, "share"); } else render();
+  } catch { render(); }
+}
+
 /* ---------- views ---------- */
 function nav() {
   const od = overdueCount();
@@ -711,7 +883,7 @@ function agendaItem(a, opts = {}) {
     <div class="body"><div class="title">${esc(a.title)}</div><div class="meta">${isTask ? `<span class="pri ${a.priority}">${a.priority === "med" ? "medium" : a.priority}</span>` : "<span>Event</span>"}
       ${subs.length ? `<span class="steps ${sd === subs.length ? "all" : ""}">${sd}/${subs.length} steps</span>` : ""}
       ${(isTask ? a.remind && a.time : reminds(a).length) ? `<span class="bell">${ICON.bell}${isTask ? "at due time" : fmtReminds(a)}</span>` : ""}${opts.day ? `<span>${fmtDay(a.due || a.date)}</span>` : ""}</div>
-      ${subs.length && !a.done ? `<div class="bar"><i style="width:${Math.round(100 * sd / subs.length)}%"></i></div>` : ""}</div>
+      ${subs.length && !a.done ? `<div class="prog"><i style="width:${Math.round(100 * sd / subs.length)}%"></i></div>` : ""}</div>
     ${opts.tree ? `<button class="icon-btn" data-act="tree" data-id="${a.id}" aria-expanded="${open}" aria-controls="tree-${a.id}" aria-label="${open ? "Hide" : "Show"} steps for ${esc(a.title)}" title="${subs.length ? "Steps" : "Add steps"}">${subs.length ? `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg>` : ICON.tree}</button>` : ""}
     ${opts.del ? `<button class="icon-btn" data-act="${isTask ? "delTask" : "delEvent"}" data-id="${a.id}" aria-label="Delete ${esc(a.title)}">${ICON.trash}</button>` : ""}${tree}</li>`;
 }
@@ -736,6 +908,7 @@ function viewToday() {
     <button class="tile" data-act="go" data-view="tasks">${ring(pct(habitsDone, S.habits.length), "Habits")}<b>Habits</b><small>${S.habits.length ? `${habitsDone} of ${S.habits.length} done` : "None yet"}</small></button>
     <button class="tile" data-act="go" data-view="me">${ring(pct(ciDone, 5), "Check-in")}<b>Check-in</b><small>${ciDone} of 5 logged</small></button>
     <button class="tile" data-act="openNote" data-date="${td}">${ring(note ? 100 : 0, "Daily note")}<b>Daily note</b><small>${note ? "Written" : "Not yet"}</small></button>
+    <button class="tile" data-act="go" data-view="money">${ring(+S.money.budget ? Math.min(100, pct(spendStats().month, +S.money.budget)) : 0, "Budget used")}<b>Spending</b><small>${esc(money(spendStats().today))} today</small></button>
   </div>
   <div class="grid">
     <section class="panel span-7"><div class="panel-head"><h2>Today's plan</h2><button class="link" data-act="go" data-view="calendar">Calendar</button></div>
@@ -802,6 +975,44 @@ function viewCalendar() {
       </form>
     </section>
   </div>`;
+}
+
+function viewMoney() {
+  const td = todayStr(), st = spendStats(), b = +S.money.budget || 0, phone = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const recent = [...S.spend].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).slice(0, 60);
+  const days = []; for (const x of recent) { let g = days.find(d => d[0] === x.date); if (!g) days.push(g = [x.date, []]); g[1].push(x); }
+  const canClip = STANDALONE && !phone && !!navigator.clipboard?.read;
+  const mo = new Date().toLocaleDateString(undefined, { month: "long" });
+  return head("Money", "Spending", "Type in what you spend, or share a payment screenshot to Daybook and it reads the amount for you.") +
+  `<div class="grid">
+    <section class="panel span-7">
+      <form data-form="addSpend" style="display:grid;gap:12px">
+        <div class="form-row"><div class="field" style="flex:1 1 180px"><label for="mn-amount">Amount</label><div class="money-in"><span>${esc(S.money.currency)}</span><input id="mn-amount" inputmode="decimal" placeholder="0.00" autocomplete="off"></div></div>
+          <div class="field"><label for="mn-date">Date</label><input type="date" id="mn-date" value="${td}" max="${td}"></div></div>
+        <fieldset class="remind-pick"><legend class="label">What was it for?</legend>${catPills("mn-cat", "")}</fieldset>
+        <input type="text" id="mn-note" placeholder="Note, e.g. nasi lemak (picks a category for you)" autocomplete="off">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button class="btn primary">Add spending</button>
+          <label class="btn file-btn">Scan a screenshot<input type="file" id="mn-file" accept="image/*"></label></div>
+        <p class="hint">${phone ? "Quicker: after you screenshot a payment, tap <b>Share</b> and pick <b>Daybook</b>. It reads the amount and asks if you want to record it." : "Quicker: copy a payment screenshot and press <b>Ctrl+V</b> here. Daybook reads the amount and asks if you want to record it."}</p>
+        ${canClip ? `<label class="check"><input type="checkbox" id="mn-clip" ${pref("clipwatch") === "1" ? "checked" : ""}>Ask me when I come back to Daybook with a new screenshot copied</label>` : ""}
+      </form>
+      <div style="margin-top:18px">${days.length ? days.map(([d, arr]) => `<p class="group-label">${fmtDay(d)} · ${esc(money(sumOf(arr)))}</p><ul class="list">${arr.map(x => { const [, l, i] = catOf(x.cat);
+        return `<li class="item"><span class="cat-ico" aria-hidden="true">${i}</span><div class="body"><div class="title">${esc(x.note || x.merchant || l)}</div><div class="meta"><span>${l}</span>${x.merchant && x.note ? `<span>${esc(x.merchant)}</span>` : ""}<span>${fmtTime(x.time)}</span>${x.src === "manual" ? "" : `<span>from ${x.src === "assistant" ? "assistant" : "screenshot"}</span>`}</div></div>
+          <span class="amt">${esc(money(x.amount))}</span><button class="icon-btn" data-act="delSpend" data-id="${x.id}" aria-label="Delete ${esc(money(x.amount))} ${esc(x.note || l)}">${ICON.trash}</button></li>`; }).join("")}</ul>`).join("")
+        : `<p class="empty">Nothing recorded yet.</p>`}</div>
+    </section>
+    <section class="panel span-5">
+      <div class="panel-head"><h2>${mo}</h2><span class="eyebrow">so far</span></div>
+      <div class="stats"><div class="stat"><div class="k">Today</div><div class="v">${esc(money(st.today))}</div></div><div class="stat"><div class="k">Last 7 days</div><div class="v">${esc(money(st.week))}</div></div><div class="stat"><div class="k">This month</div><div class="v">${esc(money(st.month))}</div></div></div>
+      ${b ? `<div style="margin-top:14px"><div class="cat-bar"><span>Budget</span><span></span><span class="muted">${esc(money(Math.max(0, b - st.month)))} left of ${esc(money(b))}</span><div class="prog"><i style="width:${Math.min(100, Math.round(100 * st.month / b))}%;${st.month > b ? "background:var(--rose)" : ""}"></i></div></div></div>` : ""}
+      <h3 class="label" style="margin:18px 0 10px">By category</h3>
+      ${st.byCat.length ? `<div class="cat-bars">${st.byCat.map(([k, v]) => { const [, l, i] = catOf(k); return `<div class="cat-bar"><span>${i}</span><span>${l}</span><b class="amt">${esc(money(v))}</b><div class="prog"><i style="width:${Math.round(100 * v / st.byCat[0][1])}%"></i></div></div>`; }).join("")}</div>` : `<p class="empty">No spending this month yet.</p>`}
+      <form data-form="moneySettings" class="form-row" style="margin-top:20px;align-items:end">
+        <div class="field" style="max-width:110px"><label for="mn-cur">Currency</label><input type="text" id="mn-cur" value="${esc(S.money.currency)}" maxlength="4"></div>
+        <div class="field" style="max-width:160px"><label for="mn-budget">Monthly budget</label><input type="number" id="mn-budget" min="0" step="10" value="${b || ""}" placeholder="None"></div>
+        <button class="btn">Save</button></form>
+    </section>
+  </div>` + receiptSheet();
 }
 
 function viewTasks() {
@@ -998,7 +1209,8 @@ function render() {
   nav();
   const main = $("#main");
   const focusId = document.activeElement && document.activeElement.id;
-  main.innerHTML = ({ today: viewToday, calendar: viewCalendar, tasks: viewTasks, notes: viewNotes, me: viewMe, ask: viewAsk })[view]();
+  main.innerHTML = ({ today: viewToday, calendar: viewCalendar, tasks: viewTasks, money: viewMoney, notes: viewNotes, me: viewMe, ask: viewAsk })[view]();
+  if (view !== "money" && receipt) main.insertAdjacentHTML("beforeend", receiptSheet());
   if (view === "ask") { const c = $("#chat"); if (c) c.scrollTop = c.scrollHeight; }
   if (focusId) { const el = document.getElementById(focusId); if (el && el.tagName !== "BUTTON") el.focus(); }
 }
@@ -1030,6 +1242,10 @@ const ACT = {
     } else commit();
   },
   delSub: b => { const t = S.tasks.find(x => x.id === b.dataset.id); const i = t?.subs?.findIndex(x => x.id === b.dataset.sub) ?? -1; if (i < 0) return; const [s] = t.subs.splice(i, 1); commit(); toast(`Deleted step "${s.title}"`, () => { t.subs.splice(i, 0, s); commit(); }); },
+  delSpend: b => { const i = S.spend.findIndex(x => x.id === b.dataset.id); if (i < 0) return; const [x] = S.spend.splice(i, 1); commit(); toast(`Deleted ${money(x.amount)}`, () => { S.spend.splice(i, 0, x); commit(); }); },
+  rcSkip: () => closeReceipt(),
+  rcSkipBg: () => closeReceipt(),
+  rcBack: () => { receipt.step = "ask"; render(); },
   delTask: b => { const i = S.tasks.findIndex(x => x.id === b.dataset.id); if (i < 0) return; const [t] = S.tasks.splice(i, 1); commit(); toast(`Deleted "${t.title}"`, () => { S.tasks.splice(i, 0, t); commit(); }); },
   delEvent: b => { const i = S.events.findIndex(x => x.id === b.dataset.id); if (i < 0) return; const [e] = S.events.splice(i, 1); commit(); toast(`Deleted "${e.title}"`, () => { S.events.splice(i, 0, e); commit(); }); },
   toggleHabit: b => { const h = S.habits.find(x => x.id === b.dataset.id); if (!h) return; const d = b.dataset.date; if (h.log[d]) delete h.log[d]; else h.log[d] = true; commit(); },
@@ -1073,7 +1289,25 @@ const ACT = {
     } catch { toast("Couldn't create the backup file."); }
   },
 };
-document.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b && ACT[b.dataset.act]) { e.preventDefault(); ACT[b.dataset.act](b, e); } });
+document.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b || !ACT[b.dataset.act]) return; if (b.dataset.act === "rcSkipBg" && e.target !== b) return; e.preventDefault(); ACT[b.dataset.act](b, e); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && receipt) closeReceipt(); });
+document.addEventListener("input", e => {
+  const id = e.target.id || "";
+  if (receipt && id.startsWith("rc-")) { const k = id.slice(3); receipt[k] = e.target.value; if (k === "amount") receipt.touched = true;
+    if (k === "note" && !receipt.catPicked) { const g = guessCat(e.target.value); const rb = g && document.querySelector(`input[name="rc-cat"][value="${g}"]`); if (rb) { rb.checked = true; receipt.cat = g; } } }
+  if (id === "mn-note" && !mnPicked) { const g = guessCat(e.target.value); const rb = g && document.querySelector(`input[name="mn-cat"][value="${g}"]`); if (rb) rb.checked = true; }
+});
+document.addEventListener("change", async e => {
+  const t = e.target;
+  if (t.name === "rc-cat" && receipt) { receipt.cat = t.value; receipt.catPicked = true; }
+  if (t.name === "mn-cat") mnPicked = true;
+  if (t.id === "mn-file" && t.files[0]) handleImage(t.files[0], "upload");
+  if (t.id === "mn-clip") {
+    if (!t.checked) { pref("clipwatch", "0"); return; }
+    try { const c = await clipSig(); pref("clipsig", c ? c.sig : ""); pref("clipwatch", "1"); toast("Daybook will ask when you come back with a new screenshot copied."); }
+    catch { t.checked = false; toast("Clipboard access was blocked. Allow it in the browser's site settings, or just press Ctrl+V."); }
+  }
+});
 
 document.addEventListener("submit", e => {
   const f = e.target.closest("[data-form]"); if (!f) return;
@@ -1083,6 +1317,26 @@ document.addEventListener("submit", e => {
     case "addEvent": { if (!v("ev-title")) return; const r = [...f.querySelectorAll('input[name="ev-remind"]:checked')].map(i => +i.value); const ev = addEvent({ title: v("ev-title"), date: v("ev-date") || calSel, time: v("ev-time"), remind: r }); calSel = ev.date; commit(); toast(`Added "${ev.title}" on ${fmtDay(ev.date)}`); break; }
     case "addTask": { if (!v("tk-title")) return; const t = addTask({ title: v("tk-title"), due: v("tk-due"), time: v("tk-time"), priority: v("tk-pri"), remind: document.getElementById("tk-remind").checked }); taskFilter = "open"; commit(); setTimeout(() => $("#tk-title")?.focus()); break; }
     case "addSub": { const t = S.tasks.find(x => x.id === f.dataset.id), title = (f.elements.sub.value || "").trim(); if (!t || !title) return; addSub(t, title); commit(); setTimeout(() => $(`#tree-${t.id} input`)?.focus()); break; }
+    case "addSpend": {
+      const amount = parseFloat(v("mn-amount").replace(/,/g, ""));
+      if (!(amount > 0)) { toast("Type an amount first."); $("#mn-amount")?.focus(); return; }
+      const cat = f.querySelector('input[name="mn-cat"]:checked')?.value || guessCat(v("mn-note")) || "other";
+      const x = addSpend({ amount, cat, note: v("mn-note"), date: v("mn-date") || todayStr() }); mnPicked = false; commit();
+      toast(`Recorded ${money(x.amount)} for ${catOf(x.cat)[1]}`); setTimeout(() => $("#mn-amount")?.focus()); break;
+    }
+    case "receipt": {
+      if (!receipt) return;
+      if (receipt.step === "ask") {
+        const a = parseFloat(String(receipt.amount).replace(/,/g, ""));
+        if (!(a > 0)) { toast("Type the amount first."); $("#rc-amount")?.focus(); return; }
+        receipt.amount = a.toFixed(2); receipt.step = "cat"; if (!receipt.cat) receipt.cat = guessCat(receipt.merchant) || "food"; render(); setTimeout(() => $("#rc-note")?.focus()); return;
+      }
+      const cat = f.querySelector('input[name="rc-cat"]:checked')?.value || receipt.cat || "other";
+      const x = addSpend({ amount: receipt.amount, cat, note: receipt.note, merchant: receipt.merchant, date: receipt.date, time: receipt.date === todayStr() ? receipt.time : "12:00", src: "screenshot" });
+      if (receipt.img) URL.revokeObjectURL(receipt.img); receipt = null; commit();
+      toast(`Recorded ${money(x.amount)} for ${catOf(x.cat)[1]}`, () => { S.spend = S.spend.filter(y => y.id !== x.id); commit(); }); break;
+    }
+    case "moneySettings": { S.money.currency = v("mn-cur").toUpperCase() || "RM"; S.money.budget = Math.max(0, parseFloat(v("mn-budget")) || 0); commit(); toast("Saved"); break; }
     case "addHabit": { if (!v("hb-name")) return; S.habits.push({ id: uid(), name: v("hb-name"), log: {} }); commit(); break; }
     case "chat": { const t = v("chat-in"); if (t) handleChat(t); break; }
     case "quickAsk": { const t = v("quick-ask"); if (t) { view = "ask"; handleChat(t); go("ask"); } break; }
@@ -1186,10 +1440,21 @@ function localReply(raw) {
   const s = raw.toLowerCase().trim().replace(/[?!.]+$/, "");
   const td = todayStr();
   if (/^(help|\?|what can you do|commands|hi|hello|hey)\b/.test(s))
-    return { text: "Here's what I can do, even offline:\n• \"remind me to call mum tomorrow at 7pm\"\n• \"add task finish slides friday high\"\n• \"meeting with advisor 12 nov at 3pm\"\n• \"note: met Aina at the library\"\n• \"mood 4, slept 7 hours, drank 6 glasses, exercised 30 min\"\n• \"done groceries\"\n• \"what's today\", \"what's tomorrow\", \"my tasks\", \"how am I doing this week\"" };
+    return { text: "Here's what I can do, even offline:\n• \"remind me to call mum tomorrow at 7pm\"\n• \"add task finish slides friday high\"\n• \"meeting with advisor 12 nov at 3pm\"\n• \"note: met Aina at the library\"\n• \"mood 4, slept 7 hours, drank 6 glasses, exercised 30 min\"\n• \"done groceries\"\n• \"spent 12.50 on lunch\", \"how much did I spend this week\"\n• \"what's today\", \"what's tomorrow\", \"my tasks\", \"how am I doing this week\"" };
 
   let m;
   if ((m = raw.match(/^\s*(?:note|jot|journal|write down|diary)\s*(?:that|:|-)?\s+([\s\S]+)/i))) { appendNote(m[1].trim()); return { text: "Added to today's note.", changed: true }; }
+
+  if (((m = raw.match(/^\s*(?:i\s+)?(?:spent|spend|paid|bought|expense)\s+(?:rm|myr|\$)?\s*(\d+(?:\.\d{1,2})?)\s*(?:rm|myr|ringgit|dollars?)?\s*(?:on|for|at)?\s*(.*)$/i)) || (m = raw.match(/^\s*(?:rm|myr|\$)\s*(\d+(?:\.\d{1,2})?)\s+(?:on|for|at)?\s*(.+)$/i))) && !/\b(min|mins|minutes|hours?|hrs?)\b/i.test(m[2])) {
+    const what = m[2].replace(/[.!]+$/, "").trim(), named = CATS.find(c => c[0] === what.toLowerCase() || c[1].toLowerCase() === what.toLowerCase());
+    const cat = named ? named[0] : guessCat(what) || "other";
+    const x = addSpend({ amount: +m[1], cat, note: named ? "" : what.charAt(0).toUpperCase() + what.slice(1), src: "assistant" });
+    return { text: `Recorded ${money(x.amount)} for ${catOf(cat)[1]}${x.note ? ` (${x.note})` : ""}. That's ${money(spendStats().today)} today.`, changed: true };
+  }
+  if (/\b(spent|spend|spending|expenses?)\b/.test(s) && /\b(how much|what|show|total|my|summary)\b/.test(s)) {
+    const st = spendStats();
+    return { text: `You've spent ${money(st.today)} today, ${money(st.week)} in the last 7 days and ${money(st.month)} this month.${st.byCat.length ? "\nThis month by category:\n" + st.byCat.slice(0, 5).map(([k, v]) => `• ${catOf(k)[1]}: ${money(v)}`).join("\n") : ""}${+S.money.budget ? `\n${money(Math.max(0, S.money.budget - st.month))} left of your ${money(S.money.budget)} budget.` : ""}` };
+  }
 
   const ci = {};
   if ((m = s.match(/\bmood (?:is |was |of |at |:)?\s*([1-5])\b/)) || (m = s.match(/\bfeel(?:ing)? (?:like )?(?:a )?([1-5])\b/))) ci.mood = +m[1];
@@ -1275,6 +1540,7 @@ function dataSummary() {
     habits: S.habits.map(h => ({ name: h.name, doneToday: !!h.log[td], streak: streak(h) })),
     checkinsLast7: Object.fromEntries(lastDays(7).filter(d => S.checkins[d]).map(d => [d, S.checkins[d]])),
     todayNote: (S.notes[td]?.text || "").slice(0, 1500),
+    spending: (() => { const st = spendStats(); return { currency: S.money.currency, monthlyBudget: +S.money.budget || null, today: st.today, last7Days: st.week, thisMonth: st.month, thisMonthByCategory: Object.fromEntries(st.byCat), recent: [...S.spend].slice(-10).map(({ amount, cat, note, merchant, date }) => ({ amount, cat, note, merchant, date })) }; })(),
   });
 }
 const TOOLS = [
@@ -1286,6 +1552,8 @@ const TOOLS = [
     execute: i => { appendNote(String(i.text), i.date ? String(i.date) : todayStr()); return { ok: true }; } },
   { name: "complete_task", description: "Mark an open task as done by id.", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
     execute: i => { const t = S.tasks.find(x => x.id === String(i.id)); if (!t) throw new Error("No task with that id"); t.done = true; t.doneAt = Date.now(); return { ok: true }; } },
+  { name: "add_expense", description: "Record money the user spent. category is one of: " + CATS.map(c => c[0]).join(", ") + ".", inputSchema: { type: "object", properties: { amount: { type: "number" }, category: { type: "string", enum: CATS.map(c => c[0]) }, note: { type: "string" }, merchant: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD, default today" } }, required: ["amount", "category"] },
+    execute: i => { if (!(Number(i.amount) > 0)) throw new Error("amount must be positive"); const x = addSpend({ amount: Number(i.amount), cat: String(i.category), note: i.note ? String(i.note) : "", merchant: i.merchant ? String(i.merchant) : "", date: i.date ? String(i.date) : todayStr(), src: "assistant" }); return { ok: true, id: x.id }; } },
   { name: "add_subtask", description: "Add a step (subtask) under an existing task, by the task id.", inputSchema: { type: "object", properties: { task_id: { type: "string" }, title: { type: "string" } }, required: ["task_id", "title"] },
     execute: i => { const t = S.tasks.find(x => x.id === String(i.task_id)); if (!t) throw new Error("No task with that id"); addSub(t, String(i.title)); return { ok: true }; } },
   { name: "log_checkin", description: "Log self-monitoring values for a date (default today): mood 1-5, energy 1-5, sleep hours, water glasses, exercise minutes.", inputSchema: { type: "object", properties: { date: { type: "string" }, mood: { type: "number" }, energy: { type: "number" }, sleep: { type: "number" }, water: { type: "number" }, exercise: { type: "number" } } },
@@ -1339,6 +1607,7 @@ render();
 setTimeout(tick, 1500);
 initStore();
 initSample();
+pickUpShare();
 })();
 </script>
 

@@ -11,12 +11,27 @@ self.addEventListener("activate", e => {
   e.waitUntil(self.clients.claim());
 });
 
+// A payment screenshot shared to Daybook from the phone's Share menu: keep the image and open the app to record it.
+async function takeShare(req) {
+  try {
+    const form = await req.formData();
+    const file = form.get("receipt");
+    if (file && file.size) {
+      const c = await caches.open("daybook-share");
+      await c.put("shared-receipt", new Response(file, { headers: { "Content-Type": file.type || "image/png" } }));
+    }
+  } catch {}
+  return Response.redirect("./?receipt=1#money", 303);
+}
+
 self.addEventListener("fetch", e => {
   const req = e.request;
+  const url = new URL(req.url);
+  if (req.method === "POST" && url.pathname.endsWith("/share-receipt")) { e.respondWith(takeShare(req)); return; }
   if (req.method !== "GET") return;
-  // Only the app itself, its fonts and the Firebase libraries; sign-in and sync traffic goes straight to the network.
-  const host = new URL(req.url).hostname;
-  if (host !== self.location.hostname && !["fonts.googleapis.com", "fonts.gstatic.com", "www.gstatic.com"].includes(host)) return;
+  // Only the app itself, its fonts, the Firebase libraries and the offline text reader; sign-in and sync traffic goes straight to the network.
+  const host = url.hostname;
+  if (host !== self.location.hostname && !["fonts.googleapis.com", "fonts.gstatic.com", "www.gstatic.com", "cdn.jsdelivr.net", "tessdata.projectnaptha.com"].includes(host)) return;
   e.respondWith(
     fetch(req)
       .then(res => {
