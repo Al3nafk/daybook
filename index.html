@@ -260,6 +260,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .ai-mode{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;font-size:.86rem}
 
 /* toasts */
+.watermark{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:30;pointer-events:none;user-select:none;
+  font-size:.7rem;font-weight:600;letter-spacing:.02em;color:var(--muted);opacity:.75;padding:3px 10px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .toasts{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;z-index:40;width:min(360px,calc(100vw - 32px))}
 .toast{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--amber);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);display:grid;gap:8px;animation:pop .25s ease-out}
 .toast.info{border-left-color:var(--accent)}
@@ -371,6 +373,7 @@ textarea{background:var(--surface);border-radius:18px;padding:14px 16px}
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .tiles .tile:nth-child(5){grid-column:span 2}
   .toasts{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .watermark{bottom:calc(84px + env(safe-area-inset-bottom,0px));right:max(14px,env(safe-area-inset-right,0px));font-size:.64rem}
   .item .time{width:62px}
 }
 @media (max-width:520px){.hero .orb{--orb:92px}}
@@ -381,6 +384,7 @@ textarea{background:var(--surface);border-radius:18px;padding:14px 16px}
   <main id="main"></main>
 </div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="watermark" role="note">Demo · still in development · Made by Alan</div>
 
 <script>
 (() => {
