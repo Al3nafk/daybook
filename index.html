@@ -298,6 +298,9 @@ textarea{background:var(--surface);border-radius:18px;padding:14px 16px}
 .auth-card{width:100%;gap:16px}
 .auth-card h1{font-size:1.7rem}
 .remind-pick{border:0;padding:0;margin:0;display:grid;gap:6px;min-width:0}
+.custom-remind{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:4px}
+.custom-remind input{width:76px;padding:6px 10px}
+.custom-remind select{width:auto;padding:6px 10px}
 .pills{display:flex;flex-wrap:wrap;gap:6px}
 .pill{position:relative;cursor:pointer}
 .pill input{position:absolute;opacity:0;pointer-events:none}
@@ -406,7 +409,13 @@ function fmtDay(s, long) {
   if (s === ymd(addDays(new Date(), -1))) return "Yesterday";
   return parseYmd(s).toLocaleDateString(undefined, long ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric", month: "short" });
 }
-function fmtRemind(min) { if (min == null) return ""; if (min === 0) return "at start"; if (min >= 1440) return `${min / 1440} day before`; if (min >= 60) return `${min / 60} h before`; return `${min} min before`; }
+// "45 min", "3 hours", "2 days", "1 week" for any number of minutes (custom reminders can be any length).
+function remindLabel(min) {
+  if (min === 0) return "At start";
+  const [n, u] = min % 10080 === 0 ? [min / 10080, "week"] : min % 1440 === 0 ? [min / 1440, "day"] : min % 60 === 0 ? [min / 60, "hour"] : [min, "min"];
+  return `${n} ${u}${n > 1 && u !== "min" ? "s" : ""}`;
+}
+function fmtRemind(min) { if (min == null) return ""; if (min === 0) return "at start"; return `${remindLabel(min)} before`; }
 // An event's reminders: minutes before the start. Older entries store one number instead of a list.
 function reminds(e) { return Array.isArray(e.remind) ? e.remind : e.remind == null ? [] : [e.remind]; }
 function fmtReminds(e) { return reminds(e).map(fmtRemind).join(", "); }
@@ -1010,7 +1019,11 @@ function viewCalendar() {
           <div class="field"><label for="ev-time">Time</label><input type="time" id="ev-time"></div>
         </div>
         <fieldset class="remind-pick"><legend class="label">Remind me before it starts (pick as many as you like)</legend>
-          <div class="pills">${REMIND_OPTS.map(([m, l]) => `<label class="pill"><input type="checkbox" name="ev-remind" value="${m}" ${m === 15 ? "checked" : ""}><span>${l}</span></label>`).join("")}</div>
+          <div class="pills" id="ev-pills">${REMIND_OPTS.map(([m, l]) => `<label class="pill"><input type="checkbox" name="ev-remind" value="${m}" ${m === 15 ? "checked" : ""}><span>${l}</span></label>`).join("")}</div>
+          <div class="custom-remind"><span class="hint">Or your own time:</span>
+            <input type="number" id="ev-cr-n" min="1" max="999" step="1" placeholder="45" aria-label="How long before">
+            <select id="ev-cr-u" aria-label="Unit"><option value="1">minutes</option><option value="60">hours</option><option value="1440">days</option><option value="10080">weeks</option></select>
+            <span class="hint">before</span><button type="button" class="btn small" data-act="addRemind">Add</button></div>
         </fieldset>
         <div><button class="btn primary">Add event</button></div>
       </form>
@@ -1288,6 +1301,14 @@ const ACT = {
   },
   delSub: b => { const t = S.tasks.find(x => x.id === b.dataset.id); const i = t?.subs?.findIndex(x => x.id === b.dataset.sub) ?? -1; if (i < 0) return; const [s] = t.subs.splice(i, 1); commit(); toast(`Deleted step "${s.title}"`, () => { t.subs.splice(i, 0, s); commit(); }); },
   delSpend: b => { const i = S.spend.findIndex(x => x.id === b.dataset.id); if (i < 0) return; const [x] = S.spend.splice(i, 1); commit(); toast(`Deleted ${money(x.amount)}`, () => { S.spend.splice(i, 0, x); commit(); }); },
+  addRemind: () => {
+    const n = Math.round(+$("#ev-cr-n").value), mins = n * +$("#ev-cr-u").value;
+    if (!(n > 0) || mins > 525600) { toast("Type how long before, like 45 minutes or 3 days."); $("#ev-cr-n").focus(); return; }
+    const box = $("#ev-pills"), have = box.querySelector(`input[value="${mins}"]`);
+    if (have) have.checked = true;
+    else box.insertAdjacentHTML("beforeend", `<label class="pill"><input type="checkbox" name="ev-remind" value="${mins}" checked><span>${remindLabel(mins)}</span></label>`);
+    $("#ev-cr-n").value = "";
+  },
   rcSkip: () => closeReceipt(),
   shotsOn: async () => { try { shotState = await SHOTS.enable({ currency: S.money.currency }); if (!shotState.photos) toast("Daybook needs access to your photos to see new screenshots. You can allow it in Android settings."); } catch {} render(); },
   shotsOff: async () => { try { shotState = await SHOTS.disable(); } catch {} render(); },
@@ -1337,7 +1358,10 @@ const ACT = {
   },
 };
 document.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b || !ACT[b.dataset.act]) return; if (b.dataset.act === "rcSkipBg" && e.target !== b) return; e.preventDefault(); ACT[b.dataset.act](b, e); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && receipt) closeReceipt(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && receipt) closeReceipt();
+  if (e.key === "Enter" && e.target.id === "ev-cr-n") { e.preventDefault(); ACT.addRemind(); } // add the custom time instead of saving the event
+});
 document.addEventListener("input", e => {
   const id = e.target.id || "";
   if (receipt && id.startsWith("rc-")) { const k = id.slice(3); receipt[k] = e.target.value; if (k === "amount") receipt.touched = true;
