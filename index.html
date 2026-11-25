@@ -597,6 +597,7 @@ if (FB) FB.auth.onAuthStateChanged(u => {
   docRef = FB.db.doc(`users/${u.uid}/data/daybook`);
   fbUnsub = watchDoc(docRef);
   render();
+  pushSubscribe();
 });
 
 /* ---------- derived data ---------- */
@@ -726,6 +727,48 @@ async function askDeviceNotif() {
   if (lnPerm !== "granted") toast("Notifications are blocked. Turn them on in Android Settings → Apps → Daybook → Notifications.");
   render();
 }
+
+/* ---------- push reminders (iPhone home-screen app and browsers): a Firebase function sends them when Daybook is closed ---------- */
+const VAPID_PUBLIC = "BMW0kJLCnRigm7n6dy6UtQwOU1ReGVz0_2he1Yt3iBSAn_JHdhSD7wcNiICt8KP_U4rFOZBmbNaoI1XrZqjS608";
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const CAN_PUSH = STANDALONE && !NATIVE && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+let pushOn = false, pushTimer = null, pushSig = "";
+function b64uBytes(s) { const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+// Registers this device for pushes (after notifications are allowed) and saves it to the signed-in user's list.
+async function pushSubscribe() {
+  if (!CAN_PUSH || !FB || !fbUser || Notification.permission !== "granted") return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(VAPID_PUBLIC) });
+    const j = sub.toJSON(); let h = 0; for (const c of j.endpoint) h = (h * 31 + c.charCodeAt(0)) | 0;
+    await FB.db.doc(`pushq/${fbUser.uid}`).set({ subs: { ["d" + (h >>> 0).toString(36)]: { endpoint: j.endpoint, keys: j.keys, added: Date.now() } } }, { merge: true });
+    pushOn = true; pushSig = ""; syncPushQueue(); render();
+  } catch (e) { console.warn("push setup failed", e); }
+}
+// Keeps the list of upcoming reminders the sender works from up to date. Every signed-in device writes it, so a change
+// made on the computer still reaches the iPhone.
+function syncPushQueue() {
+  if (!FB || !fbUser || S.example) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    const list = deviceReminders().map(({ key, at, title, body, go, date }) => ({ key, at, title, body, go: go || "", date: date || "" }));
+    const sig = JSON.stringify(list);
+    if (sig === pushSig) return;
+    try {
+      await FB.db.doc(`pushq/${fbUser.uid}`).set({ items: list, next: list.length ? firebase.firestore.Timestamp.fromMillis(list[0].at) : null }, { merge: true });
+      pushSig = sig;
+    } catch {}
+  }, 1500);
+}
+// Tapping a pushed reminder: the service worker tells the open page where to go.
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
+  const x = e.data || {};
+  if (x.type !== "open") return;
+  if (x.key) setFired(x.key, true);
+  if (x.date) { calSel = x.date; const d = parseYmd(x.date); calMonth = new Date(d.getFullYear(), d.getMonth(), 1); }
+  if (x.go) go(x.go);
+});
 
 function tick() {
   for (const r of dueReminders()) {
@@ -941,7 +984,7 @@ function nav() {
   const od = overdueCount();
   $("#nav").innerHTML = `<div class="brand"><span class="brand-mark">D</span>Daybook</div>` +
     VIEWS.map(([k, label]) => `<button class="nav-btn" data-act="go" data-view="${k}" ${view === k ? 'aria-current="page"' : ""}>${ICON[k]}<span>${label === "Assistant" && innerWidth < 820 ? "Ask" : label}</span>${k === "tasks" && od ? `<span class="badge">${od}</span>` : ""}</button>`).join("") +
-    `<div class="nav-foot">${fbUser ? `<span><strong>${esc(fbUser.displayName || fbUser.email)}</strong></span><button class="link" style="justify-self:start" data-act="signOut">Sign out</button>` : ""}<span>${LN && lnPerm === "granted" ? "Reminders arrive even when Daybook is closed." : "Reminders ring while Daybook is open."}</span><span id="netline">${navigator.onLine ? "Online" : "Offline"} · assistant works either way</span></div>`;
+    `<div class="nav-foot">${fbUser ? `<span><strong>${esc(fbUser.displayName || fbUser.email)}</strong></span><button class="link" style="justify-self:start" data-act="signOut">Sign out</button>` : ""}<span>${(LN && lnPerm === "granted") || pushOn ? "Reminders arrive even when Daybook is closed." : "Reminders ring while Daybook is open."}</span><span id="netline">${navigator.onLine ? "Online" : "Offline"} · assistant works either way</span></div>`;
 }
 function head(eyebrow, title, sub, right = "") {
   return `<header class="page-head"><div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ""}</div><div class="chips">${right}${syncChip()}</div></header>` + exampleBanner();
@@ -1271,7 +1314,8 @@ function viewMe() {
       <div class="form-row">
         ${installBtn("primary")}
         ${LN ? (lnPerm === "granted" ? `<span class="chip good"><span class="dot"></span>Reminders arrive even when Daybook is closed</span>` : `<button class="btn primary" data-act="deviceNotif">Turn on notifications</button>`) : ""}
-        ${LN ? "" : "Notification" in window ? (Notification.permission === "granted" ? `<span class="chip good"><span class="dot"></span>Notifications on</span>` : `<button class="btn primary" data-act="enableNotif">Turn on notifications</button>`) : ""}
+        ${LN ? "" : "Notification" in window ? (Notification.permission === "granted" ? `<span class="chip good"><span class="dot"></span>${pushOn ? "Reminders arrive even when Daybook is closed" : "Notifications on"}</span>` : `<button class="btn primary" data-act="enableNotif">Turn on notifications</button>`) : ""}
+        ${STANDALONE && IS_IOS && !IS_INSTALLED ? `<p class="muted" style="margin:0;font-size:.85rem">For reminders on this iPhone while Daybook is closed: tap Share, choose <b>Add to Home Screen</b>, then open Daybook from your home screen and tap Turn on notifications (iOS 16.4 or later).</p>` : ""}
         <button class="btn" data-act="exportData">Download backup</button>
         <label class="btn" for="import-file">Restore from backup</label><input type="file" id="import-file" accept="application/json,.json" hidden>
       </div>
@@ -1330,6 +1374,7 @@ function render() {
   }
   nav();
   syncDeviceReminders();
+  syncPushQueue();
   const main = $("#main");
   const focusId = document.activeElement && document.activeElement.id;
   main.innerHTML = ({ today: viewToday, calendar: viewCalendar, tasks: viewTasks, money: viewMoney, notes: viewNotes, me: viewMe, ask: viewAsk })[view]();
@@ -1410,7 +1455,12 @@ const ACT = {
     FB.auth.sendPasswordResetEmail(authEmail).then(() => { authMsg = ""; toast(`Password reset email sent to ${authEmail}`); render(); }).catch(e => { authMsg = authError(e.code); render(); });
   },
   signOut: () => { flush(); FB && FB.auth.signOut(); },
-  enableNotif: async () => { try { await Notification.requestPermission(); } catch {} render(); },
+  enableNotif: async () => {
+    try { await Notification.requestPermission(); } catch {}
+    if (Notification.permission === "granted") await pushSubscribe();
+    else if (Notification.permission === "denied") toast(IS_IOS ? "Notifications are blocked. Turn them on in iPhone Settings → Notifications → Daybook." : "Notifications are blocked. Allow them in your browser's site settings.");
+    render();
+  },
   deviceNotif: () => askDeviceNotif(),
   exportData: () => {
     try {

@@ -43,7 +43,21 @@ self.addEventListener("fetch", e => {
   );
 });
 
+// A reminder pushed by the Daybook reminder sender (arrives even when the app is closed, including on iPhone).
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: "Daybook", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Daybook reminder", {
+    body: d.body || "", tag: d.key || undefined, icon: "icon-192.png", badge: "icon-192.png",
+    data: { key: d.key || "", go: d.go || "", date: d.date || "" },
+  }));
+});
+
 self.addEventListener("notificationclick", e => {
   e.notification.close();
-  e.waitUntil(self.clients.matchAll({ type: "window" }).then(list => list[0] ? list[0].focus() : self.clients.openWindow("./")));
+  const x = e.notification.data || {};
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+    if (list[0]) { list[0].postMessage({ type: "open", ...x }); return list[0].focus(); }
+    return self.clients.openWindow(x.go ? "./#" + x.go : "./");
+  }));
 });
