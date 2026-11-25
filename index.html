@@ -664,6 +664,69 @@ function dueReminders() {
     out.push({ key, title: "Time for today's note", body: "A few lines about your day. It takes a minute.", go: "notes" });
   return out;
 }
+/* ---------- device notifications (Android app): reminders arrive even when Daybook is closed ---------- */
+const LN = NATIVE && Capacitor.Plugins ? Capacitor.Plugins.LocalNotifications : null;
+let lnPerm = "", lnTimer = null, lnSig = "";
+const nativeId = key => { let h = 0; for (const c of key) h = (h * 31 + c.charCodeAt(0)) | 0; return (Math.abs(h) % 2000000000) + 1; };
+function deviceReminders() {
+  const now = Date.now(), horizon = now + 30 * 864e5, out = [];
+  for (const e of S.events) if (e.time) for (const m of reminds(e)) {
+    const at = dt(e.date, e.time) - m * 6e4, key = `ev:${e.id}:${e.date}T${e.time}:${m}`;
+    if (at > now + 5e3 && at < horizon && !isFired(key, now)) out.push({ key, at, title: e.title, body: `${fmtDay(e.date)} at ${fmtTime(e.time)}${m ? " · " + fmtRemind(m) : ""}`, go: "calendar", date: e.date });
+  }
+  for (const t of S.tasks) {
+    if (t.done || !t.remind || !t.due || !t.time) continue;
+    const at = dt(t.due, t.time), key = `tk:${t.id}:${t.due}T${t.time}`;
+    if (at > now + 5e3 && at < horizon && !isFired(key, now)) out.push({ key, at, title: t.title, body: `Task due ${fmtTime(t.time)}`, go: "tasks", taskId: t.id });
+  }
+  const nr = S.noteReminder;
+  if (nr.enabled) for (let i = 0; i < 7; i++) {
+    const day = ymd(addDays(new Date(), i)), at = dt(day, nr.time), key = "note:" + day;
+    if (at > now + 5e3 && !(S.notes[day]?.text || "").trim() && !isFired(key, now)) out.push({ key, at, title: "Time for your daily note", body: "A few lines about your day. It takes a minute.", go: "notes" });
+  }
+  return out.sort((a, b) => a.at - b.at).slice(0, 60);
+}
+// Hands the next reminders to Android so they ring on time with the app closed. Runs after every change.
+function syncDeviceReminders() {
+  if (!LN || lnPerm !== "granted" || S.example || (FB && !fbUser)) return;
+  clearTimeout(lnTimer);
+  lnTimer = setTimeout(async () => {
+    const list = deviceReminders(), sig = JSON.stringify(list.map(r => [r.key, r.at, r.title, r.body]));
+    if (sig === lnSig) return;
+    try {
+      const pending = await LN.getPending();
+      if (pending.notifications.length) await LN.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+      if (list.length) await LN.schedule({ notifications: list.map(r => ({ id: nativeId(r.key), title: r.title, body: r.body, channelId: "reminders",
+        schedule: { at: new Date(r.at), allowWhileIdle: true }, smallIcon: "ic_stat_daybook", iconColor: "#7438E8", extra: { key: r.key, go: r.go, date: r.date || "", taskId: r.taskId || "" } })) });
+      lnSig = sig;
+    } catch {}
+  }, 1200);
+}
+async function initDeviceReminders() {
+  if (!LN) return;
+  try {
+    await LN.createChannel({ id: "reminders", name: "Reminders", description: "Events, tasks and your daily note", importance: 5, visibility: 1, vibration: true });
+    let p = await LN.checkPermissions();
+    if (p.display !== "granted" && p.display !== "denied") p = await LN.requestPermissions();
+    lnPerm = p.display;
+    LN.addListener("localNotificationActionPerformed", a => {
+      const x = a.notification?.extra || {};
+      if (x.key) setFired(x.key, true);
+      if (x.date) { calSel = x.date; const d = parseYmd(x.date); calMonth = new Date(d.getFullYear(), d.getMonth(), 1); }
+      if (x.go) go(x.go);
+    });
+    // Seen in the app already: don't ring again on the phone.
+    LN.addListener("localNotificationReceived", n => { const k = n.extra?.key; if (k && !document.hidden) shown.add(k); });
+  } catch {}
+  render();
+}
+async function askDeviceNotif() {
+  if (!LN) return;
+  try { const p = await LN.requestPermissions(); lnPerm = p.display; } catch {}
+  if (lnPerm !== "granted") toast("Notifications are blocked. Turn them on in Android Settings → Apps → Daybook → Notifications.");
+  render();
+}
+
 function tick() {
   for (const r of dueReminders()) {
     if (shown.has(r.key)) continue;
@@ -878,7 +941,7 @@ function nav() {
   const od = overdueCount();
   $("#nav").innerHTML = `<div class="brand"><span class="brand-mark">D</span>Daybook</div>` +
     VIEWS.map(([k, label]) => `<button class="nav-btn" data-act="go" data-view="${k}" ${view === k ? 'aria-current="page"' : ""}>${ICON[k]}<span>${label === "Assistant" && innerWidth < 820 ? "Ask" : label}</span>${k === "tasks" && od ? `<span class="badge">${od}</span>` : ""}</button>`).join("") +
-    `<div class="nav-foot">${fbUser ? `<span><strong>${esc(fbUser.displayName || fbUser.email)}</strong></span><button class="link" style="justify-self:start" data-act="signOut">Sign out</button>` : ""}<span>Reminders ring while Daybook is open.</span><span id="netline">${navigator.onLine ? "Online" : "Offline"} · assistant works either way</span></div>`;
+    `<div class="nav-foot">${fbUser ? `<span><strong>${esc(fbUser.displayName || fbUser.email)}</strong></span><button class="link" style="justify-self:start" data-act="signOut">Sign out</button>` : ""}<span>${LN && lnPerm === "granted" ? "Reminders arrive even when Daybook is closed." : "Reminders ring while Daybook is open."}</span><span id="netline">${navigator.onLine ? "Online" : "Offline"} · assistant works either way</span></div>`;
 }
 function head(eyebrow, title, sub, right = "") {
   return `<header class="page-head"><div><p class="eyebrow">${eyebrow}</p><h1>${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ""}</div><div class="chips">${right}${syncChip()}</div></header>` + exampleBanner();
@@ -1207,7 +1270,8 @@ function viewMe() {
       ${fbUser ? `<div class="form-row" style="align-items:center"><span>Signed in as <strong>${esc(fbUser.displayName || fbUser.email)}</strong> <span class="muted">${esc(fbUser.displayName ? fbUser.email : "")}</span></span><button class="btn" data-act="signOut">Sign out</button></div>` : ""}
       <div class="form-row">
         ${installBtn("primary")}
-        ${"Notification" in window ? (Notification.permission === "granted" ? `<span class="chip good"><span class="dot"></span>Notifications on</span>` : `<button class="btn primary" data-act="enableNotif">Turn on notifications</button>`) : ""}
+        ${LN ? (lnPerm === "granted" ? `<span class="chip good"><span class="dot"></span>Reminders arrive even when Daybook is closed</span>` : `<button class="btn primary" data-act="deviceNotif">Turn on notifications</button>`) : ""}
+        ${LN ? "" : "Notification" in window ? (Notification.permission === "granted" ? `<span class="chip good"><span class="dot"></span>Notifications on</span>` : `<button class="btn primary" data-act="enableNotif">Turn on notifications</button>`) : ""}
         <button class="btn" data-act="exportData">Download backup</button>
         <label class="btn" for="import-file">Restore from backup</label><input type="file" id="import-file" accept="application/json,.json" hidden>
       </div>
@@ -1265,6 +1329,7 @@ function render() {
     return;
   }
   nav();
+  syncDeviceReminders();
   const main = $("#main");
   const focusId = document.activeElement && document.activeElement.id;
   main.innerHTML = ({ today: viewToday, calendar: viewCalendar, tasks: viewTasks, money: viewMoney, notes: viewNotes, me: viewMe, ask: viewAsk })[view]();
@@ -1346,6 +1411,7 @@ const ACT = {
   },
   signOut: () => { flush(); FB && FB.auth.signOut(); },
   enableNotif: async () => { try { await Notification.requestPermission(); } catch {} render(); },
+  deviceNotif: () => askDeviceNotif(),
   exportData: () => {
     try {
       const a = document.createElement("a");
@@ -1680,6 +1746,7 @@ initStore();
 initSample();
 pickUpShare();
 initNative();
+initDeviceReminders();
 })();
 </script>
 
